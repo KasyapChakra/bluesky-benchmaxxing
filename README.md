@@ -1,5 +1,7 @@
 # Bluesky Benchmaxxing
 
+Live at https://blueskybenchmaxxing.com
+
 Public leaderboard for the one-week English Bluesky simulation benchmark
 (holdout week Sep 18–25 2026, 8 futures, two losses: per-liker Brier on likes
 and size-band CRPS on daily follower counts).
