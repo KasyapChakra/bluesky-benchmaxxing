@@ -65,13 +65,22 @@
   .notice{background:#fff7e0;border:1px solid #f0d78a;border-radius:10px;padding:12px 16px;font-size:.92rem;margin-bottom:18px}
   .notice code{font-family:var(--mono);font-size:.85em}
   /* formulas */
-  .formulas{max-width:760px}
+  .formulas{max-width:860px}
   .formulas p{margin:.6rem 0}
-  .formulas .eq{margin:14px 0;padding:14px 16px;background:#fafafa;border:1px solid var(--line);border-radius:10px;overflow-x:auto}
-  .terms{margin:8px 0 18px;padding-left:0;list-style:none}
-  .terms li{margin:8px 0;padding-left:0}
-  .terms .sym{display:inline-block;min-width:110px;font-family:var(--mono);font-size:.9em;padding-right:8px}
-  .formulas h3{margin:26px 0 6px;font-size:1rem}
+  .formulas .lead{color:#333;margin-bottom:1.2rem}
+  .formulas h3{margin:34px 0 8px;font-size:1.15rem;letter-spacing:-.01em}
+  .formulas .dim{color:var(--muted);font-weight:400}
+  .steps{display:grid;grid-template-columns:96px 1fr;gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:14px 0 16px;background:#fafafa}
+  .steps .lab{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:16px 0 0 16px;border-top:1px solid var(--line)}
+  .steps .eq{padding:12px 16px 12px 4px;border-top:1px solid var(--line);overflow-x:auto;font-size:1.05rem}
+  .steps .lab:first-child,.steps .lab:first-child + .eq{border-top:none}
+  .defs{display:grid;grid-template-columns:max-content 1fr;gap:0 22px;margin:0 0 12px}
+  .defs dt,.defs dd{margin:0;padding:7px 0;border-bottom:1px solid #f0f1f3;font-size:.93rem;line-height:1.5}
+  .defs dt{font-family:var(--mono);font-size:.85rem;color:var(--muted);white-space:nowrap}
+  .defs dt .katex{font-size:1.05em;color:var(--ink)}
+  .defs dd{color:#222}
+  .read{font-size:.93rem;padding:10px 14px;background:#f5f7f9;border-radius:8px}
+  .why{font-size:.9rem;color:#444}
   /* modal */
   .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:flex-start;justify-content:center;padding:6vh 16px;z-index:50;overflow:auto}
   .backdrop.open{display:flex}
@@ -137,45 +146,48 @@
   </section>
 
   <section class="panel formulas" id="panel-how">
-    <p>The benchmark: one week of English Bluesky (Sep 18–25, 2026). Everything the held-out accounts did that week (posts, replies, likes, follows, reposts) and real news-account posts are copied into the simulation at the real moment; the rest of the network is simulated. This is run \(K = 8\) times with different seeds, giving 8 futures. Both losses are proper scores: the best a simulator can do is report its true uncertainty. Lower is better; 0 is perfect; neither is capped.</p>
+    <p class="lead">One week of English Bluesky, Sep 18–25, 2026. Everything the held-out accounts did that week and real news-account posts are copied into the simulation at the real moment; the rest of the network is simulated, \(K = 8\) times with different seeds. Both losses are proper scores: a simulator does best by reporting its true uncertainty. Lower is better, 0 is perfect, neither is capped.</p>
 
-    <h3>Loss 1 — Liker Brier (likes)</h3>
-    <p>For each held-out post, did each person like it, and how sure was the simulation? Scored once per post at the end of the week.</p>
-    <div class="eq">\[
-      L_1 \;=\; \operatorname*{mean}_{g \in \text{groups}} \;\operatorname*{mean}_{a \in g} \;\operatorname*{mean}_{q \in \text{posts}(a)} \;
-      \frac{\displaystyle\sum_{u \in U_q} \big(p_{u,q} - y_{u,q}\big)^2}{\max(L_q,\,1)}
-    \]</div>
-    <ul class="terms">
-      <li><span class="sym">\(q\)</span> one held-out post (replies count as posts).</li>
-      <li><span class="sym">\(U_q\)</span> everyone who liked \(q\) by the end of the week in reality <em>or</em> in at least one of the 8 futures. Anyone else would contribute exactly 0, so no candidate list is needed.</li>
-      <li><span class="sym">\(p_{u,q}\)</span> \(= \tfrac{1}{K}\sum_{k=1}^{K} \mathbf{1}[\,u \text{ liked } q \text{ in future } k\,]\): the share of futures in which person \(u\) liked the post. The simulation's probability, in eighths.</li>
-      <li><span class="sym">\(y_{u,q}\)</span> 1 if \(u\) really liked \(q\), else 0.</li>
-      <li><span class="sym">\((p-y)^2\)</span> the Brier score for that person. Squared, not plain distance: plain distance is minimised by rounding every person to 0 or 1 (a majority vote across futures), which throws away the uncertainty the futures were run to capture. Squaring charges a full 1 for confidently wrong and only 0.09 for saying 30% to someone who didn't like it, so the best move is the true probability. Splits into <b>misses</b> \(\sum_{y=1}(1-p)^2\) and <b>false alarms</b> \(\sum_{y=0}p^2\).</li>
-      <li><span class="sym">\(L_q\)</span> the post's real like count. Dividing by it turns the sum into "share of this post's likes gotten wrong, with partial credit": 0 = perfect, 1 = produced nothing, 2 = right count from all the wrong people. Without it, one 2,000-like post would outweigh 400 five-like posts. \(\max(L_q,1)\) only avoids dividing by zero.</li>
-      <li><span class="sym">means</span> post → account → sampling group → overall, each a plain mean. Every group weighs the same, so the growth accounts count as much as everyone else.</li>
-    </ul>
+    <h3>Loss 1 — Liker Brier <span class="dim">(likes)</span></h3>
+    <p>For every held-out post: did each person like it, and how sure was the simulation? Scored once per post at the end of the week.</p>
+    <div class="steps">
+      <div class="lab">per person</div><div class="eq">\( \displaystyle p_{u,q} \;=\; \dfrac{1}{K}\sum_{k=1}^{K} \mathbf{1}\big[\,u \text{ liked } q \text{ in future } k\,\big] \)</div>
+      <div class="lab">per post</div><div class="eq">\( \displaystyle S_q \;=\; \dfrac{1}{\max(L_q,\,1)} \sum_{u \in U_q} \big(p_{u,q} - y_{u,q}\big)^2 \)</div>
+      <div class="lab">overall</div><div class="eq">\( \displaystyle L_1 \;=\; \dfrac{1}{|G|}\sum_{g \in G}\; \dfrac{1}{|A_g|}\sum_{a \in A_g}\; \dfrac{1}{|Q_a|}\sum_{q \in Q_a} S_q \)</div>
+    </div>
+    <dl class="defs">
+      <dt>\(q\)</dt><dd>a held-out post (replies count too); \(Q_a\) the posts of account \(a\)</dd>
+      <dt>\(U_q\)</dt><dd>everyone who liked \(q\) in reality or in at least one future. Anyone else contributes exactly 0</dd>
+      <dt>\(p_{u,q}\)</dt><dd>share of the 8 futures in which person \(u\) liked \(q\): the simulation's probability, in eighths</dd>
+      <dt>\(y_{u,q}\)</dt><dd>1 if \(u\) really liked \(q\), else 0</dd>
+      <dt>\((p-y)^2\)</dt><dd>Brier score for that person. Misses \((1-p)^2\) over real likers, false alarms \(p^2\) over the rest</dd>
+      <dt>\(L_q\)</dt><dd>the post's real like count; \(\max(L_q,1)\) only avoids dividing by zero</dd>
+      <dt>\(G,\;A_g\)</dt><dd>the sampling groups and the held-out accounts in each; every group weighs the same</dd>
+    </dl>
+    <p class="read"><b>Reading it:</b> 0 = every liker right in every future · 1 = produced no likes at all · 2 = right count, all the wrong people.</p>
+    <p class="why"><b>Why squared:</b> plain distance \(|p-y|\) is minimised by rounding every person to 0 or 1, which throws away the uncertainty the futures exist to capture. Squaring charges a full 1 for confidently wrong and 0.09 for saying 30% to someone who didn't like it, so the best report is the true chance. <b>Why divide by \(L_q\):</b> otherwise one 2,000-like post outweighs 400 five-like posts. Dividing by reality only (never by anything the simulation controls) keeps it ungameable.</p>
 
-    <h3>Loss 2 — Follower CRPS (followers)</h3>
-    <p>For each held-out account and each day, how many followers it gained and lost, split by the size of the follower. Which exact person followed is not scored (at under 1% per person, 8 futures can't resolve it); what kind of account followed is.</p>
-    <div class="eq">\[
-      L_2 \;=\; \operatorname*{mean}_{g \in \text{groups}} \;\operatorname*{mean}_{a \in g} \;\operatorname*{mean}_{d=1}^{7} \;
-      \sum_{s \in S} \operatorname{CRPS}\!\big(x^{(s)}_{a,d},\; y^{(s)}_{a,d}\big)
-    \]</div>
-    <div class="eq">\[
-      \operatorname{CRPS}(x, y) \;=\; \frac{1}{K}\sum_{k=1}^{K} \big|x_k - y\big| \;-\; \frac{1}{2K(K-1)} \sum_{k \ne j} \big|x_k - x_j\big|
-    \]</div>
-    <ul class="terms">
-      <li><span class="sym">\(S\)</span> six series per account per day: new followers from accounts with under 1K followers, 1K–10K, over 10K, and unfollows in the same three bands. Size is read at the start of the week, the same for real and simulated. Total gain and net change are sums of these and are not scored separately.</li>
-      <li><span class="sym">\(y\)</span> \(= \log(1 + \text{real count})\) for that series, account and day.</li>
-      <li><span class="sym">\(x_k\)</span> \(= \log(1 + \text{simulated count in future } k)\), \(k = 1..8\). Log first, then compare, so a distance of 0.69 means "off by 2×" whether the day had 10 followers or 1,000. Percent change would be lopsided and would cap at 1; log keeps counting.</li>
-      <li><span class="sym">first term</span> average distance of the futures from reality.</li>
-      <li><span class="sym">second term</span> half the average distance between futures, the credit for spread. Without it the score is minimised by collapsing all 8 futures onto one value; with the full spread subtracted a scattered forecast could score below zero. Half is the amount that makes a forecast shaped like reality the best one. When all 8 futures agree, CRPS is plain \(|x - y|\).</li>
-      <li><span class="sym">\(K(K-1)\)</span> pairs over \(k \ne j\), the "fair" form: unbiased at any number of futures, so 8 and 32 are judged alike.</li>
-      <li><span class="sym">means</span> day → account → group → overall. The number stays in log units: 0.69 ≈ off by 2×, 2.3 ≈ off by 10×.</li>
-    </ul>
+    <h3>Loss 2 — Follower CRPS <span class="dim">(followers)</span></h3>
+    <p>For every held-out account and day: how many followers it gained and lost, split by the follower's size. The exact person is not scored (under 1% per person, 8 futures can't see it); the kind of account is.</p>
+    <div class="steps">
+      <div class="lab">log counts</div><div class="eq">\( \displaystyle y \;=\; \log(1 + \text{real count}) \qquad x_k \;=\; \log(1 + \text{count in future } k) \)</div>
+      <div class="lab">per series</div><div class="eq">\( \displaystyle \operatorname{CRPS}(x, y) \;=\; \dfrac{1}{K}\sum_{k=1}^{K} |x_k - y| \;-\; \dfrac{1}{2K(K-1)} \sum_{k \neq j} |x_k - x_j| \)</div>
+      <div class="lab">per day</div><div class="eq">\( \displaystyle D_{a,d} \;=\; \sum_{s \in S} \operatorname{CRPS}\big(x^{(s)}_{a,d},\, y^{(s)}_{a,d}\big) \)</div>
+      <div class="lab">overall</div><div class="eq">\( \displaystyle L_2 \;=\; \dfrac{1}{|G|}\sum_{g \in G}\; \dfrac{1}{|A_g|}\sum_{a \in A_g}\; \dfrac{1}{7}\sum_{d=1}^{7} D_{a,d} \)</div>
+    </div>
+    <dl class="defs">
+      <dt>\(S\)</dt><dd>six series per account per day: new followers from accounts with &lt;1K, 1K–10K, &gt;10K followers, and unfollows in the same three bands (size read at the start of the week)</dd>
+      <dt>\(y,\;x_k\)</dt><dd>real and simulated counts on a log scale, so a distance of 0.69 means "off by 2×" whether the day had 10 followers or 1,000</dd>
+      <dt>first term</dt><dd>average distance of the 8 futures from reality</dd>
+      <dt>second term</dt><dd>half the average distance between futures: the credit for honest spread</dd>
+      <dt>\(K(K-1)\)</dt><dd>pairs over \(k \neq j\), the "fair" form, unbiased at any number of futures</dd>
+      <dt>\(d\)</dt><dd>day of the week, 1–7; \(D_{a,d}\) the six CRPS values added</dd>
+    </dl>
+    <p class="read"><b>Reading it:</b> stays in log units · 0 = every daily count exactly right · 0.69 ≈ typically off by 2× · 2.3 ≈ off by 10×. When all 8 futures agree, CRPS is plain \(|x-y|\).</p>
+    <p class="why"><b>Why subtract half the spread:</b> the first term alone is minimised by collapsing all 8 futures onto one value. Subtracting half the spread makes a forecast shaped like reality the best one; subtracting all of it would let a scattered forecast score below zero. <b>Why log, not percent:</b> percent error is lopsided and caps at 1, so a 10× miss and a 1,000× miss look the same; log keeps counting, which is where the growth accounts live.</p>
 
     <h3>Bars on the leaderboard</h3>
-    <p>Bar height is \(e^{-\text{loss}}\): 1.0 for a perfect score, 0.5 at a loss of 0.69, 0.25 at 1.39. The list is ordered by the combined score \(\tfrac{1}{2}\big(e^{-L_1} + e^{-L_2}\big)\), higher first.</p>
+    <p>Bar height is \(e^{-\text{loss}}\): 1.0 for perfect, 0.5 at a loss of 0.69, 0.25 at 1.39. Entries are ordered by \(\tfrac{1}{2}\big(e^{-L_1} + e^{-L_2}\big)\), highest first.</p>
   </section>
 </div>
 
