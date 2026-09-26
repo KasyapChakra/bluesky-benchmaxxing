@@ -42,12 +42,12 @@
   .chart{position:relative;display:flex;align-items:flex-end;gap:26px;min-height:300px;padding:0 6px 0 54px;min-width:max-content}
   .guide{position:absolute;left:54px;right:6px;border-top:1px dashed #d9dbdf;pointer-events:none}
   .guide span{position:absolute;left:-54px;top:-9px;width:48px;text-align:right;font-family:var(--mono);font-size:.7rem;color:var(--muted)}
-  .group{display:flex;flex-direction:column;align-items:center;width:118px;position:relative;z-index:1}
+  .group{display:flex;flex-direction:column;align-items:center;width:140px;position:relative;z-index:1}
   .bars{display:flex;align-items:flex-end;gap:6px;height:220px}
   .bar{width:30px;border-radius:5px 5px 0 0;position:relative;transition:height .3s}
   .bar.likes{background:var(--likes)} .bar.follow{background:var(--follow)}
   .bar .n{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:.72rem;color:var(--ink);white-space:nowrap}
-  .group .t{margin-top:10px;font-size:.82rem;font-weight:600;text-align:center;max-width:118px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .group .t{margin-top:10px;font-size:.82rem;font-weight:600;text-align:center;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .group .d{font-size:.72rem;color:var(--muted)}
   .group.best .t::before{content:"★ ";color:#c9a000}
   .entries{display:flex;flex-direction:column;gap:14px}
@@ -253,9 +253,6 @@
     const bestId = rows.length ? rows.reduce((a, r) => score(r) > score(a) ? r : a).id : null;
     const H_PX = 220;
     let html = '';
-    [[1, 'loss 0'], [0.5, '0.69'], [0.25, '1.39'], [0.125, '2.08']].forEach(([f, lab]) => {
-      html += '<div class="guide" style="bottom:' + (f * H_PX + 62) + 'px"><span>' + lab + '</span></div>';
-    });
     if (!rows.length) html += '<div class="empty" style="width:100%;align-self:center">No scores yet.</div>';
     rows.forEach(r => {
       const h1 = Math.max(2, Math.exp(-r.likes_loss) * H_PX), h2 = Math.max(2, Math.exp(-r.followers_loss) * H_PX);
@@ -269,6 +266,14 @@
       '</div>';
     });
     chart.innerHTML = html;
+    // guide lines, positioned from the measured base of the bars so they stay aligned whatever the font does
+    const bars = chart.querySelector('.bars');
+    const base = bars ? chart.getBoundingClientRect().bottom - bars.getBoundingClientRect().bottom : 48;
+    [[1, 'loss 0'], [0.5, '0.69'], [0.25, '1.39'], [0.125, '2.08']].forEach(([f, lab]) => {
+      const g = document.createElement('div'); g.className = 'guide';
+      g.style.bottom = (f * H_PX + base) + 'px'; g.innerHTML = '<span>' + lab + '</span>';
+      chart.appendChild(g);
+    });
 
     // entries, best first
     const sorted = rows.slice().sort((a, b) => score(b) - score(a));
