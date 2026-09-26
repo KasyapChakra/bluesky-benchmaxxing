@@ -1,0 +1,4 @@
+window.BENCHMAXXING_CONFIG = {
+  supabaseUrl: "https://vsqdeouzqonizokktdyb.supabase.co",
+  supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzcWRlb3V6cW9uaXpva2t0ZHliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3MzI3NDQsImV4cCI6MjEwMjMwODc0NH0.Ajg6bBJ0_gFZne_Ble8Vit2InZZWhpBWDaSl_6XTay8"
+};

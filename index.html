@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bluesky Benchmaxxing</title>
+<meta name="description" content="Leaderboard for the one-week English Bluesky simulation benchmark: per-liker Brier on likes and size-band CRPS on daily follower counts.">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<style>
+  :root{
+    --ink:#111418; --muted:#666c75; --line:#e5e7ea; --paper:#fff;
+    --likes:#0b6e99; --follow:#2e8b57; --accent:#111418;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55}
+  a{color:inherit}
+  .wrap{max-width:1040px;margin:0 auto;padding:28px 20px 80px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:6px}
+  h1{font-size:2rem;letter-spacing:-.02em;margin:0;font-weight:800}
+  .sub{color:var(--muted);font-size:.92rem;margin:0 0 22px}
+  .btn{font:inherit;font-weight:600;border:1.5px solid var(--ink);background:var(--ink);color:#fff;border-radius:8px;padding:9px 14px;cursor:pointer;white-space:nowrap}
+  .btn.secondary{background:#fff;color:var(--ink)}
+  .btn:disabled{opacity:.5;cursor:default}
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:8px 0 26px}
+  .tab{font:inherit;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;padding:10px 14px;cursor:pointer;color:var(--muted);margin-bottom:-1px}
+  .tab.active{color:var(--ink);border-bottom-color:var(--ink)}
+  .panel{display:none}.panel.active{display:block}
+  h2{font-size:1.15rem;margin:34px 0 12px;letter-spacing:-.01em}
+  h2:first-child{margin-top:0}
+  .best{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .card{border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+  .card .name{font-weight:700;font-size:1rem}
+  .card .what{color:var(--muted);font-size:.85rem;margin-top:2px}
+  .card .val{font-family:var(--mono);font-size:2.4rem;font-weight:600;margin:10px 0 2px;letter-spacing:-.02em}
+  .card .who{font-size:.9rem;color:var(--muted)}
+  .card.likes .val{color:var(--likes)} .card.follow .val{color:var(--follow)}
+  .legend{display:flex;gap:18px;align-items:center;color:var(--muted);font-size:.85rem;margin:0 0 10px;flex-wrap:wrap}
+  .sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:6px}
+  .chart-outer{border:1px solid var(--line);border-radius:12px;padding:18px 18px 12px;overflow-x:auto}
+  .chart{position:relative;display:flex;align-items:flex-end;gap:26px;min-height:300px;padding:0 6px 0 54px;min-width:max-content}
+  .guide{position:absolute;left:54px;right:6px;border-top:1px dashed #d9dbdf;pointer-events:none}
+  .guide span{position:absolute;left:-54px;top:-9px;width:48px;text-align:right;font-family:var(--mono);font-size:.7rem;color:var(--muted)}
+  .group{display:flex;flex-direction:column;align-items:center;width:118px;position:relative;z-index:1}
+  .bars{display:flex;align-items:flex-end;gap:6px;height:220px}
+  .bar{width:30px;border-radius:5px 5px 0 0;position:relative;transition:height .3s}
+  .bar.likes{background:var(--likes)} .bar.follow{background:var(--follow)}
+  .bar .n{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:.72rem;color:var(--ink);white-space:nowrap}
+  .group .t{margin-top:10px;font-size:.82rem;font-weight:600;text-align:center;max-width:118px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .group .d{font-size:.72rem;color:var(--muted)}
+  .group.best .t::before{content:"★ ";color:#c9a000}
+  .entries{display:flex;flex-direction:column;gap:14px}
+  .entry{border:1px solid var(--line);border-radius:12px;padding:16px 20px}
+  .entry .top{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
+  .entry .rank{font-family:var(--mono);color:var(--muted);margin-right:8px}
+  .entry .title{font-weight:700;font-size:1.05rem}
+  .entry .meta{color:var(--muted);font-size:.82rem;margin-top:2px}
+  .entry .nums{font-family:var(--mono);font-size:.88rem;white-space:nowrap}
+  .entry .nums b{font-weight:600}
+  .entry .nums .l1{color:var(--likes)} .entry .nums .l2{color:var(--follow)}
+  .entry .desc{margin-top:10px;white-space:pre-wrap;font-size:.95rem}
+  .entry .rm{font-size:.75rem;color:var(--muted);background:none;border:none;cursor:pointer;padding:0;margin-top:8px;text-decoration:underline}
+  .empty{color:var(--muted);padding:26px;text-align:center;border:1px dashed var(--line);border-radius:12px}
+  .notice{background:#fff7e0;border:1px solid #f0d78a;border-radius:10px;padding:12px 16px;font-size:.92rem;margin-bottom:18px}
+  .notice code{font-family:var(--mono);font-size:.85em}
+  /* formulas */
+  .formulas{max-width:760px}
+  .formulas p{margin:.6rem 0}
+  .formulas .eq{margin:14px 0;padding:14px 16px;background:#fafafa;border:1px solid var(--line);border-radius:10px;overflow-x:auto}
+  .terms{margin:8px 0 18px;padding-left:0;list-style:none}
+  .terms li{margin:8px 0;padding-left:0}
+  .terms .sym{display:inline-block;min-width:110px;font-family:var(--mono);font-size:.9em;padding-right:8px}
+  .formulas h3{margin:26px 0 6px;font-size:1rem}
+  /* modal */
+  .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:flex-start;justify-content:center;padding:6vh 16px;z-index:50;overflow:auto}
+  .backdrop.open{display:flex}
+  .modal{background:#fff;border-radius:14px;width:100%;max-width:560px;padding:22px 24px 20px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+  .modal h2{margin:0 0 14px;font-size:1.25rem}
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:.85rem;font-weight:600;margin-bottom:4px}
+  .field .hint{font-weight:400;color:var(--muted)}
+  .field input,.field textarea{width:100%;font:inherit;padding:9px 10px;border:1px solid #cfd3d8;border-radius:8px;background:#fff}
+  .field textarea{min-height:120px;resize:vertical}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:14px;align-items:center}
+  .err{color:#b3261e;font-size:.88rem;margin-right:auto}
+  @media (max-width:640px){
+    h1{font-size:1.55rem}
+    .best{grid-template-columns:1fr}
+    .row2{grid-template-columns:1fr}
+    .card .val{font-size:1.9rem}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Bluesky Benchmaxxing</h1>
+    <button class="btn" id="open-submit">Submit a score</button>
+  </header>
+  <p class="sub">One simulated week of English Bluesky (Sep 18–25, 2026, 8 futures). Two losses, lower is better.</p>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="board">Leaderboard</button>
+    <button class="tab" data-tab="how">How the losses are computed</button>
+  </div>
+
+  <section class="panel active" id="panel-board">
+    <div id="notice"></div>
+    <h2>Current best</h2>
+    <div class="best">
+      <div class="card likes">
+        <div class="name">Liker Brier <span style="color:var(--muted);font-weight:400">· likes</span></div>
+        <div class="what">per-person Brier over likers ÷ real likes · 0 = perfect · 1 = produced nothing</div>
+        <div class="val" id="best-l1">—</div>
+        <div class="who" id="best-l1-who"></div>
+      </div>
+      <div class="card follow">
+        <div class="name">Follower CRPS <span style="color:var(--muted);font-weight:400">· followers</span></div>
+        <div class="what">fair CRPS on log daily follower counts, 3 size bands × new/unfollow · 0 = perfect · 0.69 ≈ off by 2×</div>
+        <div class="val" id="best-l2">—</div>
+        <div class="who" id="best-l2-who"></div>
+      </div>
+    </div>
+
+    <h2>Scores over time</h2>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--likes)"></i>Liker Brier</span>
+      <span><i class="sw" style="background:var(--follow)"></i>Follower CRPS</span>
+      <span>bar height = e<sup>−loss</sup>, so a lower loss is a taller bar (1.0 = perfect)</span>
+    </div>
+    <div class="chart-outer"><div class="chart" id="chart"></div></div>
+
+    <h2>All submissions, best first</h2>
+    <div class="entries" id="entries"></div>
+  </section>
+
+  <section class="panel formulas" id="panel-how">
+    <p>The benchmark: one week of English Bluesky (Sep 18–25, 2026). Everything the held-out accounts did that week (posts, replies, likes, follows, reposts) and real news-account posts are copied into the simulation at the real moment; the rest of the network is simulated. This is run \(K = 8\) times with different seeds, giving 8 futures. Both losses are proper scores: the best a simulator can do is report its true uncertainty. Lower is better; 0 is perfect; neither is capped.</p>
+
+    <h3>Loss 1 — Liker Brier (likes)</h3>
+    <p>For each held-out post, did each person like it, and how sure was the simulation? Scored once per post at the end of the week.</p>
+    <div class="eq">\[
+      L_1 \;=\; \operatorname*{mean}_{g \in \text{groups}} \;\operatorname*{mean}_{a \in g} \;\operatorname*{mean}_{q \in \text{posts}(a)} \;
+      \frac{\displaystyle\sum_{u \in U_q} \big(p_{u,q} - y_{u,q}\big)^2}{\max(L_q,\,1)}
+    \]</div>
+    <ul class="terms">
+      <li><span class="sym">\(q\)</span> one held-out post (replies count as posts).</li>
+      <li><span class="sym">\(U_q\)</span> everyone who liked \(q\) by the end of the week in reality <em>or</em> in at least one of the 8 futures. Anyone else would contribute exactly 0, so no candidate list is needed.</li>
+      <li><span class="sym">\(p_{u,q}\)</span> \(= \tfrac{1}{K}\sum_{k=1}^{K} \mathbf{1}[\,u \text{ liked } q \text{ in future } k\,]\): the share of futures in which person \(u\) liked the post. The simulation's probability, in eighths.</li>
+      <li><span class="sym">\(y_{u,q}\)</span> 1 if \(u\) really liked \(q\), else 0.</li>
+      <li><span class="sym">\((p-y)^2\)</span> the Brier score for that person. Squared, not plain distance: plain distance is minimised by rounding every person to 0 or 1 (a majority vote across futures), which throws away the uncertainty the futures were run to capture. Squaring charges a full 1 for confidently wrong and only 0.09 for saying 30% to someone who didn't like it, so the best move is the true probability. Splits into <b>misses</b> \(\sum_{y=1}(1-p)^2\) and <b>false alarms</b> \(\sum_{y=0}p^2\).</li>
+      <li><span class="sym">\(L_q\)</span> the post's real like count. Dividing by it turns the sum into "share of this post's likes gotten wrong, with partial credit": 0 = perfect, 1 = produced nothing, 2 = right count from all the wrong people. Without it, one 2,000-like post would outweigh 400 five-like posts. \(\max(L_q,1)\) only avoids dividing by zero.</li>
+      <li><span class="sym">means</span> post → account → sampling group → overall, each a plain mean. Every group weighs the same, so the growth accounts count as much as everyone else.</li>
+    </ul>
+
+    <h3>Loss 2 — Follower CRPS (followers)</h3>
+    <p>For each held-out account and each day, how many followers it gained and lost, split by the size of the follower. Which exact person followed is not scored (at under 1% per person, 8 futures can't resolve it); what kind of account followed is.</p>
+    <div class="eq">\[
+      L_2 \;=\; \operatorname*{mean}_{g \in \text{groups}} \;\operatorname*{mean}_{a \in g} \;\operatorname*{mean}_{d=1}^{7} \;
+      \sum_{s \in S} \operatorname{CRPS}\!\big(x^{(s)}_{a,d},\; y^{(s)}_{a,d}\big)
+    \]</div>
+    <div class="eq">\[
+      \operatorname{CRPS}(x, y) \;=\; \frac{1}{K}\sum_{k=1}^{K} \big|x_k - y\big| \;-\; \frac{1}{2K(K-1)} \sum_{k \ne j} \big|x_k - x_j\big|
+    \]</div>
+    <ul class="terms">
+      <li><span class="sym">\(S\)</span> six series per account per day: new followers from accounts with under 1K followers, 1K–10K, over 10K, and unfollows in the same three bands. Size is read at the start of the week, the same for real and simulated. Total gain and net change are sums of these and are not scored separately.</li>
+      <li><span class="sym">\(y\)</span> \(= \log(1 + \text{real count})\) for that series, account and day.</li>
+      <li><span class="sym">\(x_k\)</span> \(= \log(1 + \text{simulated count in future } k)\), \(k = 1..8\). Log first, then compare, so a distance of 0.69 means "off by 2×" whether the day had 10 followers or 1,000. Percent change would be lopsided and would cap at 1; log keeps counting.</li>
+      <li><span class="sym">first term</span> average distance of the futures from reality.</li>
+      <li><span class="sym">second term</span> half the average distance between futures, the credit for spread. Without it the score is minimised by collapsing all 8 futures onto one value; with the full spread subtracted a scattered forecast could score below zero. Half is the amount that makes a forecast shaped like reality the best one. When all 8 futures agree, CRPS is plain \(|x - y|\).</li>
+      <li><span class="sym">\(K(K-1)\)</span> pairs over \(k \ne j\), the "fair" form: unbiased at any number of futures, so 8 and 32 are judged alike.</li>
+      <li><span class="sym">means</span> day → account → group → overall. The number stays in log units: 0.69 ≈ off by 2×, 2.3 ≈ off by 10×.</li>
+    </ul>
+
+    <h3>Bars on the leaderboard</h3>
+    <p>Bar height is \(e^{-\text{loss}}\): 1.0 for a perfect score, 0.5 at a loss of 0.69, 0.25 at 1.39. The list is ordered by the combined score \(\tfrac{1}{2}\big(e^{-L_1} + e^{-L_2}\big)\), higher first.</p>
+  </section>
+</div>
+
+<div class="backdrop" id="backdrop">
+  <form class="modal" id="submit-form" novalidate>
+    <h2>Submit a score</h2>
+    <div class="field"><label>Model title</label><input name="title" maxlength="120" required placeholder="e.g. per-person v2, 12 layers, rollout loss"></div>
+    <div class="row2">
+      <div class="field"><label>Liker Brier <span class="hint">(likes loss, ≥ 0)</span></label><input name="l1" type="number" step="any" min="0" required placeholder="0.756"></div>
+      <div class="field"><label>Follower CRPS <span class="hint">(followers loss, ≥ 0)</span></label><input name="l2" type="number" step="any" min="0" required placeholder="0.176"></div>
+    </div>
+    <div class="field"><label>How it works <span class="hint">(shown under the entry)</span></label><textarea name="desc" placeholder="What the model is, what it reads, how it was trained, what changed from the last one."></textarea></div>
+    <div class="row2">
+      <div class="field"><label>Your name <span class="hint">(optional)</span></label><input name="by" maxlength="60"></div>
+      <div class="field"><label>Submit code</label><input name="code" autocomplete="off" required></div>
+    </div>
+    <div class="actions">
+      <span class="err" id="submit-err"></span>
+      <button type="button" class="btn secondary" id="cancel-submit">Cancel</button>
+      <button type="submit" class="btn" id="do-submit">Submit</button>
+    </div>
+  </form>
+</div>
+
+<script src="config.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.getElementById('panel-how'),{delimiters:[{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}]})"></script>
+<script>
+(function(){
+  const cfg = window.BENCHMAXXING_CONFIG || {};
+  const H = { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + cfg.supabaseAnonKey, 'Content-Type': 'application/json' };
+  const REST = cfg.supabaseUrl + '/rest/v1';
+  const $ = id => document.getElementById(id);
+  const fmt = v => (v == null ? '—' : (Math.abs(v) >= 10 ? v.toFixed(2) : v.toFixed(3)));
+  const score = r => 0.5 * (Math.exp(-r.likes_loss) + Math.exp(-r.followers_loss));
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const day = iso => new Date(iso).toLocaleDateString(undefined, {year:'numeric', month:'short', day:'numeric'});
+
+  // tabs
+  document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === b));
+    document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + b.dataset.tab));
+  }));
+
+  async function load(){
+    let rows;
+    try {
+      const r = await fetch(REST + '/benchmaxxing_scores?select=*&order=created_at.asc', { headers: H });
+      if (!r.ok) {
+        const body = await r.text();
+        $('notice').innerHTML = /benchmaxxing_scores/.test(body) || r.status === 404
+          ? '<div class="notice">The database table isn\'t set up yet. Run <code>supabase/schema.sql</code> from the repo in the Supabase SQL editor once, then reload.</div>'
+          : '<div class="notice">Could not load scores (' + r.status + '): ' + esc(body.slice(0, 200)) + '</div>';
+        rows = [];
+      } else { rows = await r.json(); $('notice').innerHTML = ''; }
+    } catch (e) {
+      $('notice').innerHTML = '<div class="notice">Could not reach the database: ' + esc(e.message) + '</div>';
+      rows = [];
+    }
+    render(rows);
+  }
+
+  function render(rows){
+    // best cards
+    const b1 = rows.length ? rows.reduce((a, r) => r.likes_loss < a.likes_loss ? r : a) : null;
+    const b2 = rows.length ? rows.reduce((a, r) => r.followers_loss < a.followers_loss ? r : a) : null;
+    $('best-l1').textContent = b1 ? fmt(b1.likes_loss) : '—';
+    $('best-l1-who').textContent = b1 ? b1.model_title + ' · ' + day(b1.created_at) : 'no scores yet';
+    $('best-l2').textContent = b2 ? fmt(b2.followers_loss) : '—';
+    $('best-l2-who').textContent = b2 ? b2.model_title + ' · ' + day(b2.created_at) : 'no scores yet';
+
+    // chart, chronological
+    const chart = $('chart');
+    const bestId = rows.length ? rows.reduce((a, r) => score(r) > score(a) ? r : a).id : null;
+    const H_PX = 220;
+    let html = '';
+    [[1, 'loss 0'], [0.5, '0.69'], [0.25, '1.39'], [0.125, '2.08']].forEach(([f, lab]) => {
+      html += '<div class="guide" style="bottom:' + (f * H_PX + 62) + 'px"><span>' + lab + '</span></div>';
+    });
+    if (!rows.length) html += '<div class="empty" style="width:100%;align-self:center">No scores yet.</div>';
+    rows.forEach(r => {
+      const h1 = Math.max(2, Math.exp(-r.likes_loss) * H_PX), h2 = Math.max(2, Math.exp(-r.followers_loss) * H_PX);
+      html += '<div class="group' + (r.id === bestId ? ' best' : '') + '">' +
+        '<div class="bars">' +
+          '<div class="bar likes" style="height:' + h1.toFixed(1) + 'px"><span class="n">' + fmt(r.likes_loss) + '</span></div>' +
+          '<div class="bar follow" style="height:' + h2.toFixed(1) + 'px"><span class="n">' + fmt(r.followers_loss) + '</span></div>' +
+        '</div>' +
+        '<div class="t" title="' + esc(r.model_title) + '">' + esc(r.model_title) + '</div>' +
+        '<div class="d">' + day(r.created_at) + '</div>' +
+      '</div>';
+    });
+    chart.innerHTML = html;
+
+    // entries, best first
+    const sorted = rows.slice().sort((a, b) => score(b) - score(a));
+    $('entries').innerHTML = sorted.length ? sorted.map((r, i) =>
+      '<div class="entry" data-id="' + r.id + '">' +
+        '<div class="top">' +
+          '<div><span class="rank">#' + (i + 1) + '</span><span class="title">' + esc(r.model_title) + '</span>' +
+            '<div class="meta">' + day(r.created_at) + (r.submitted_by ? ' · ' + esc(r.submitted_by) : '') + ' · combined ' + score(r).toFixed(3) + '</div></div>' +
+          '<div class="nums"><span class="l1">Liker Brier <b>' + fmt(r.likes_loss) + '</b></span> &nbsp; <span class="l2">Follower CRPS <b>' + fmt(r.followers_loss) + '</b></span></div>' +
+        '</div>' +
+        (r.description ? '<div class="desc">' + esc(r.description) + '</div>' : '') +
+        '<button class="rm" data-id="' + r.id + '">remove</button>' +
+      '</div>').join('') : '<div class="empty">No submissions yet. Be the first.</div>';
+    document.querySelectorAll('.rm').forEach(b => b.addEventListener('click', () => remove(b.dataset.id)));
+  }
+
+  async function rpc(name, body){
+    const r = await fetch(REST + '/rpc/' + name, { method: 'POST', headers: H, body: JSON.stringify(body) });
+    if (!r.ok) {
+      let msg = 'error ' + r.status;
+      try { const j = await r.json(); msg = j.message || j.hint || msg; } catch (e) {}
+      throw new Error(msg);
+    }
+    return r.status === 204 ? null : r.json();
+  }
+
+  async function remove(id){
+    const code = prompt('Remove this entry? Enter the submit code to confirm.');
+    if (!code) return;
+    try { await rpc('benchmaxxing_delete', { p_code: code, p_id: Number(id) }); await load(); }
+    catch (e) { alert('Could not remove: ' + e.message); }
+  }
+
+  // modal
+  const bd = $('backdrop'), form = $('submit-form'), err = $('submit-err');
+  const open = () => { err.textContent = ''; bd.classList.add('open'); form.title.focus(); };
+  const close = () => bd.classList.remove('open');
+  $('open-submit').addEventListener('click', open);
+  $('cancel-submit').addEventListener('click', close);
+  bd.addEventListener('click', e => { if (e.target === bd) close(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    err.textContent = '';
+    const f = form.elements;
+    const l1 = parseFloat(f.l1.value), l2 = parseFloat(f.l2.value);
+    if (!f.title.value.trim()) return err.textContent = 'Model title is required.';
+    if (!(l1 >= 0) || !(l2 >= 0)) return err.textContent = 'Both losses must be numbers ≥ 0.';
+    if (!f.code.value.trim()) return err.textContent = 'Submit code is required.';
+    $('do-submit').disabled = true;
+    try {
+      await rpc('benchmaxxing_submit', {
+        p_code: f.code.value.trim(), p_model_title: f.title.value.trim(), p_description: f.desc.value.trim(),
+        p_likes_loss: l1, p_followers_loss: l2, p_submitted_by: f.by.value.trim() || null
+      });
+      form.reset(); close(); await load();
+      document.querySelector('.tab[data-tab="board"]').click();
+    } catch (ex) { err.textContent = ex.message; }
+    finally { $('do-submit').disabled = false; }
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>
