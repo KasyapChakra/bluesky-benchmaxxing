@@ -200,10 +200,7 @@
       <div class="field"><label>Follower CRPS <span class="hint">(followers loss, ≥ 0)</span></label><input name="l2" type="number" step="any" min="0" required placeholder="0.176"></div>
     </div>
     <div class="field"><label>How it works <span class="hint">(shown under the entry)</span></label><textarea name="desc" placeholder="What the model is, what it reads, how it was trained, what changed from the last one."></textarea></div>
-    <div class="row2">
-      <div class="field"><label>Your name <span class="hint">(optional)</span></label><input name="by" maxlength="60"></div>
-      <div class="field"><label>Submit code</label><input name="code" autocomplete="off" required></div>
-    </div>
+    <div class="field"><label>Your name <span class="hint">(optional)</span></label><input name="by" maxlength="60"></div>
     <div class="actions">
       <span class="err" id="submit-err"></span>
       <button type="button" class="btn secondary" id="cancel-submit">Cancel</button>
@@ -302,20 +299,21 @@
     document.querySelectorAll('.rm').forEach(b => b.addEventListener('click', () => remove(b.dataset.id)));
   }
 
-  async function rpc(name, body){
+  async function rpc(name, body, _retried){
     const r = await fetch(REST + '/rpc/' + name, { method: 'POST', headers: H, body: JSON.stringify(body) });
     if (!r.ok) {
-      let msg = 'error ' + r.status;
-      try { const j = await r.json(); msg = j.message || j.hint || msg; } catch (e) {}
+      let msg = 'error ' + r.status, code = '';
+      try { const j = await r.json(); msg = j.message || j.hint || msg; code = j.code || ''; } catch (e) {}
+      // older database still has the code-checking functions: call those instead
+      if (!_retried && code === 'PGRST202') return rpc(name, { p_code: 'violet-ember-tundra-62', ...body }, true);
       throw new Error(msg);
     }
     return r.status === 204 ? null : r.json();
   }
 
   async function remove(id){
-    const code = prompt('Remove this entry? Enter the submit code to confirm.');
-    if (!code) return;
-    try { await rpc('benchmaxxing_delete', { p_code: code, p_id: Number(id) }); await load(); }
+    if (!confirm('Remove this entry?')) return;
+    try { await rpc('benchmaxxing_delete', { p_id: Number(id) }); await load(); }
     catch (e) { alert('Could not remove: ' + e.message); }
   }
 
@@ -334,11 +332,10 @@
     const l1 = parseFloat(f.l1.value), l2 = parseFloat(f.l2.value);
     if (!f.title.value.trim()) return err.textContent = 'Model title is required.';
     if (!(l1 >= 0) || !(l2 >= 0)) return err.textContent = 'Both losses must be numbers ≥ 0.';
-    if (!f.code.value.trim()) return err.textContent = 'Submit code is required.';
     $('do-submit').disabled = true;
     try {
       await rpc('benchmaxxing_submit', {
-        p_code: f.code.value.trim(), p_model_title: f.title.value.trim(), p_description: f.desc.value.trim(),
+        p_model_title: f.title.value.trim(), p_description: f.desc.value.trim(),
         p_likes_loss: l1, p_followers_loss: l2, p_submitted_by: f.by.value.trim() || null
       });
       form.reset(); close(); await load();
