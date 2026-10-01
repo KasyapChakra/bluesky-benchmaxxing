@@ -7,12 +7,12 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="48x48" href="/favicon.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<meta name="description" content="Leaderboard for the one-week English Bluesky simulation benchmark: per-liker Brier on likes and size-band CRPS on daily follower counts.">
+<meta name="description" content="Leaderboard for the one-week English Bluesky simulation benchmark: per-liker Brier on likes, size-band CRPS on follower counts and Poisson deviance on like counts, each over the whole week and over 2-day windows.">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <style>
   :root{
     --ink:#111418; --muted:#666c75; --line:#e5e7ea; --paper:#fff;
-    --likes:#0b6e99; --follow:#2e8b57; --accent:#111418;
+    --likes:#0b6e99; --follow:#2e8b57; --pois:#8a4bb8; --accent:#111418;
     --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
     --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   }
@@ -32,25 +32,29 @@
   .panel{display:none}.panel.active{display:block}
   h2{font-size:1.15rem;margin:34px 0 12px;letter-spacing:-.01em}
   h2:first-child{margin-top:0}
-  .best{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .bests{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
   .card{border:1px solid var(--line);border-radius:12px;padding:18px 20px}
   .card .name{font-weight:700;font-size:1rem}
   .card .what{color:var(--muted);font-size:.85rem;margin-top:2px}
   .card .val{font-family:var(--mono);font-size:2.4rem;font-weight:600;margin:10px 0 2px;letter-spacing:-.02em}
   .card .who{font-size:.9rem;color:var(--muted)}
-  .card.likes .val{color:var(--likes)} .card.follow .val{color:var(--follow)}
+  .card.likes .val{color:var(--likes)} .card.follow .val{color:var(--follow)} .card.pois .val{color:var(--pois)}
+  .card .two{font-size:.85rem;color:var(--muted);margin-top:10px;padding-top:9px;border-top:1px solid var(--line)}
+  .card .two b{font-family:var(--mono);font-weight:600;color:var(--ink)}
+  .chart-note{color:var(--muted);font-size:.88rem;margin:-4px 0 10px}
   .legend{display:flex;gap:18px;align-items:center;color:var(--muted);font-size:.85rem;margin:0 0 10px;flex-wrap:wrap}
   .sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:6px}
   .chart-outer{border:1px solid var(--line);border-radius:12px;padding:18px 18px 12px;overflow-x:auto}
   .chart{position:relative;display:flex;align-items:flex-end;gap:26px;min-height:300px;padding:0 6px 0 54px;min-width:max-content}
   .guide{position:absolute;left:54px;right:6px;border-top:1px dashed #d9dbdf;pointer-events:none}
   .guide span{position:absolute;left:-54px;top:-9px;width:48px;text-align:right;font-family:var(--mono);font-size:.7rem;color:var(--muted)}
-  .group{display:flex;flex-direction:column;align-items:center;width:140px;position:relative;z-index:1}
+  .group{display:flex;flex-direction:column;align-items:center;width:150px;position:relative;z-index:1}
   .bars{display:flex;align-items:flex-end;gap:6px;height:220px}
   .bar{width:30px;border-radius:5px 5px 0 0;position:relative;transition:height .3s}
-  .bar.likes{background:var(--likes)} .bar.follow{background:var(--follow)}
+  .bar.likes{background:var(--likes)} .bar.follow{background:var(--follow)} .bar.pois{background:var(--pois)} .bar.na{background:#e3e5e8}
+  .bar.na .n{color:var(--muted)}
   .bar .n{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:.72rem;color:var(--ink);white-space:nowrap}
-  .group .t{margin-top:10px;font-size:.82rem;font-weight:600;text-align:center;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .group .t{margin-top:10px;font-size:.82rem;font-weight:600;text-align:center;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .group .d{font-size:.72rem;color:var(--muted)}
   .group.best .t::before{content:"★ ";color:#c9a000}
   .entries{display:flex;flex-direction:column;gap:14px}
@@ -59,9 +63,13 @@
   .entry .rank{font-family:var(--mono);color:var(--muted);margin-right:8px}
   .entry .title{font-weight:700;font-size:1.05rem}
   .entry .meta{color:var(--muted);font-size:.82rem;margin-top:2px}
-  .entry .nums{font-family:var(--mono);font-size:.88rem;white-space:nowrap}
-  .entry .nums b{font-weight:600}
-  .entry .nums .l1{color:var(--likes)} .entry .nums .l2{color:var(--follow)}
+  .nt{border-collapse:collapse;font-family:var(--mono);font-size:.84rem;white-space:nowrap}
+  .nt th,.nt td{padding:2px 0 2px 14px;text-align:right}
+  .nt th{font-family:var(--sans);font-size:.74rem;font-weight:600;color:var(--muted)}
+  .nt tbody th{text-align:left;padding-left:0}
+  .nt td{font-weight:600}
+  .nt .l1{color:var(--likes)} .nt .l2{color:var(--follow)} .nt .l3{color:var(--pois)} .nt .na{color:#b8bcc2;font-weight:400}
+  .older{color:var(--muted);font-size:.88rem;margin:22px 0 2px}
   .entry .desc{margin-top:10px;white-space:pre-wrap;font-size:.95rem}
   .entry .rm{font-size:.75rem;color:var(--muted);background:none;border:none;cursor:pointer;padding:0;margin-top:8px;text-decoration:underline}
   .empty{color:var(--muted);padding:26px;text-align:center;border:1px dashed var(--line);border-radius:12px}
@@ -73,7 +81,7 @@
   .formulas .lead{color:#333;margin-bottom:1.2rem}
   .formulas h3{margin:34px 0 8px;font-size:1.15rem;letter-spacing:-.01em}
   .formulas .dim{color:var(--muted);font-weight:400}
-  .steps{display:grid;grid-template-columns:96px 1fr;gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:14px 0 16px;background:#fafafa}
+  .steps{display:grid;grid-template-columns:112px 1fr;gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:14px 0 16px;background:#fafafa}
   .steps .lab{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:16px 0 0 16px;border-top:1px solid var(--line)}
   .steps .eq{padding:12px 16px 12px 4px;border-top:1px solid var(--line);overflow-x:auto;font-size:1.05rem}
   .steps .lab:first-child,.steps .lab:first-child + .eq{border-top:none}
@@ -95,12 +103,14 @@
   .field input,.field textarea{width:100%;font:inherit;padding:9px 10px;border:1px solid #cfd3d8;border-radius:8px;background:#fff}
   .field textarea{min-height:120px;resize:vertical}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .row3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .sect{font-size:.74rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
   .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:14px;align-items:center}
   .err{color:#b3261e;font-size:.88rem;margin-right:auto}
   @media (max-width:640px){
     h1{font-size:1.55rem}
-    .best{grid-template-columns:1fr}
-    .row2{grid-template-columns:1fr}
+    .bests{grid-template-columns:1fr}
+    .row2,.row3{grid-template-columns:1fr}
     .card .val{font-size:1.9rem}
   }
 </style>
@@ -111,7 +121,7 @@
     <h1>Bluesky Benchmaxxing</h1>
     <button class="btn" id="open-submit">Submit a score</button>
   </header>
-  <p class="sub">One simulated week of English Bluesky (Sep 18–25, 2026, 8 futures). Two losses, lower is better.</p>
+  <p class="sub">One simulated week of English Bluesky (Sep 18–25, 2026, 8 futures). Three losses, each at two timescales. Lower is better.</p>
 
   <div class="tabs">
     <button class="tab active" data-tab="board">Leaderboard</button>
@@ -121,35 +131,50 @@
   <section class="panel active" id="panel-board">
     <div id="notice"></div>
     <h2>Current best</h2>
-    <div class="best">
+    <div class="bests">
       <div class="card likes">
-        <div class="name">Liker Brier <span style="color:var(--muted);font-weight:400">· likes</span></div>
+        <div class="name">Liker Brier <span style="color:var(--muted);font-weight:400">· who liked</span></div>
         <div class="what">per-person Brier over likers ÷ real likes · 0 = perfect · 1 = produced nothing</div>
         <div class="val" id="best-l1">—</div>
         <div class="who" id="best-l1-who"></div>
+        <div class="two">2-day: <b id="best-l1-2d">—</b> <span id="best-l1-2d-who"></span></div>
       </div>
       <div class="card follow">
         <div class="name">Follower CRPS <span style="color:var(--muted);font-weight:400">· followers</span></div>
         <div class="what">fair CRPS on log daily follower counts, 3 size bands × new/unfollow · 0 = perfect · 0.69 ≈ off by 2×</div>
         <div class="val" id="best-l2">—</div>
         <div class="who" id="best-l2-who"></div>
+        <div class="two">2-day: <b id="best-l2-2d">—</b> <span id="best-l2-2d-who"></span></div>
+      </div>
+      <div class="card pois">
+        <div class="name">Like-count Poisson <span style="color:var(--muted);font-weight:400">· how many likes</span></div>
+        <div class="what">Poisson deviance of each post's like count against the futures' average ÷ the account's usual likes · 0 = perfect · ≈ 0.4–0.6 = off by 2×</div>
+        <div class="val" id="best-l3">—</div>
+        <div class="who" id="best-l3-who"></div>
+        <div class="two">2-day: <b id="best-l3-2d">—</b> <span id="best-l3-2d-who"></span></div>
       </div>
     </div>
 
-    <h2>Scores over time</h2>
+    <h2>Scores over time · headline timescale</h2>
+    <p class="chart-note">Likes scored once on the whole week; followers scored day by day.</p>
     <div class="legend">
       <span><i class="sw" style="background:var(--likes)"></i>Liker Brier</span>
       <span><i class="sw" style="background:var(--follow)"></i>Follower CRPS</span>
-      <span>bar height = e<sup>−loss</sup>, so a lower loss is a taller bar (1.0 = perfect)</span>
+      <span><i class="sw" style="background:var(--pois)"></i>Like-count Poisson</span>
+      <span>bar height = e<sup>−loss</sup>, so a lower loss is a taller bar (1.0 = perfect) · grey = not reported</span>
     </div>
     <div class="chart-outer"><div class="chart" id="chart"></div></div>
+
+    <h2>Scores over time · 2-day windows</h2>
+    <p class="chart-note">The same three losses on every 2-day stretch of the week (days 1–2, 2–3, … 6–7), averaged over the six stretches.</p>
+    <div class="chart-outer"><div class="chart" id="chart2d"></div></div>
 
     <h2>All submissions, best first</h2>
     <div class="entries" id="entries"></div>
   </section>
 
   <section class="panel formulas" id="panel-how">
-    <p class="lead">One week of English Bluesky, Sep 18–25, 2026. Everything the held-out accounts did that week and real news-account posts are copied into the simulation at the real moment; the rest of the network is simulated, \(K = 8\) times with different seeds. Both losses are proper scores: a simulator does best by reporting its true uncertainty. Lower is better, 0 is perfect, neither is capped.</p>
+    <p class="lead">One week of English Bluesky, Sep 18–25, 2026 (days 1–7 are UTC days, day 1 = Sep 18). Everything the held-out accounts did that week and real news-account posts are copied into the simulation at the real moment; the rest of the network is simulated, \(K = 8\) times with different seeds. Three losses: who liked each post (Loss 1), how many followers each account gained and lost (Loss 2), and how many likes each post got (Loss 3). Each is reported at its headline timescale and again on 2-day windows, so every entry has six numbers. Lower is better, 0 is perfect, none is capped.</p>
 
     <h3>Loss 1 — Liker Brier <span class="dim">(likes)</span></h3>
     <p>For every held-out post: did each person like it, and how sure was the simulation? Scored once per post at the end of the week.</p>
@@ -189,8 +214,45 @@
     <p class="read"><b>Reading it:</b> stays in log units · 0 = every daily count exactly right · 0.69 ≈ typically off by 2× · 2.3 ≈ off by 10×. When all 8 futures agree, CRPS is plain \(|x-y|\).</p>
     <p class="why"><b>Why subtract half the spread:</b> the first term alone is minimised by collapsing all 8 futures onto one value. Subtracting half the spread makes a forecast shaped like reality the best one; subtracting all of it would let a scattered forecast score below zero. <b>Why log, not percent:</b> percent error is lopsided and caps at 1, so a 10× miss and a 1,000× miss look the same; log keeps counting, which is where the growth accounts live.</p>
 
+    <h3>Loss 3 — Like-count Poisson <span class="dim">(likes, how many)</span></h3>
+    <p>For every held-out post: how many likes did it get, against the simulation's expected count? Loss 1 checks who liked; this checks how many. Scored once per post at the end of the week.</p>
+    <div class="steps">
+      <div class="lab">expected</div><div class="eq">\( \displaystyle \lambda_q \;=\; \dfrac{1}{K}\sum_{k=1}^{K} n_{q,k} \qquad \tilde\lambda_q \;=\; \begin{cases} \max\!\big(\lambda_q,\, \tfrac{1}{2K}\big) & y_q > 0 \\ \lambda_q & y_q = 0 \end{cases} \)</div>
+      <div class="lab">per post</div><div class="eq">\( \displaystyle D_q \;=\; 2\Big(\, y_q \log \dfrac{y_q}{\tilde\lambda_q} \;-\; y_q \;+\; \tilde\lambda_q \Big) \qquad (0 \log 0 = 0) \)</div>
+      <div class="lab">overall</div><div class="eq">\( \displaystyle L_3 \;=\; \dfrac{1}{|G|}\sum_{g \in G}\; \dfrac{1}{|A_g|}\sum_{a \in A_g}\; \dfrac{1}{|Q_a|}\sum_{q \in Q_a} \dfrac{D_q}{c_a} \)</div>
+    </div>
+    <dl class="defs">
+      <dt>\(n_{q,k}\)</dt><dd>likes post \(q\) got by the end of the week in future \(k\)</dd>
+      <dt>\(y_q\)</dt><dd>likes \(q\) really got by the end of the week (the same count as \(L_q\) in Loss 1)</dd>
+      <dt>\(\lambda_q\)</dt><dd>the simulation's expected like count: the average over the 8 futures. Only the average enters this loss; the spread across futures does not</dd>
+      <dt>\(\tilde\lambda_q\)</dt><dd>\(\lambda_q\) with a floor of \(\tfrac{1}{16}\) (half a like across 8 futures), used only when the post really got likes. A liked post that got zero likes in every future pays a large but finite price; a correct zero still costs nothing</dd>
+      <dt>\(D_q\)</dt><dd>Poisson deviance: twice the gap in Poisson log-likelihood between the simulation's rate and the perfect rate \(y_q\). It is 0 only when \(\lambda_q = y_q\); for a post with no real likes it is \(2\lambda_q\)</dd>
+      <dt>\(c_a\)</dt><dd>account \(a\)'s usual likes per post before the week: likes received ÷ posts made (replies count) over Aug 28–Sep 17, 2026, floored at 1; 1 if it made no posts then</dd>
+      <dt>\(G,\;A_g,\;Q_a\)</dt><dd>as in Loss 1: groups weigh the same, accounts within a group weigh the same, posts within an account weigh the same</dd>
+    </dl>
+    <p class="read"><b>Reading it:</b> 0 = every post's expected count exactly right · for a post at the account's usual level, ≈ 0.61 = predicted 2× too many, ≈ 0.39 = predicted half as many · ≈ 13 = 10× too many, ≈ 2.8 = a tenth as many.</p>
+    <p class="why"><b>Why Poisson deviance:</b> it is the Poisson log-likelihood shifted so a perfect count scores 0, and its best report is the true expected count, so a simulator cannot gain by shading its counts up or down. It is the count companion to Loss 1: a simulation that gives a post the right number of likes from the wrong people does well here and badly there. <b>Why divide by \(c_a\):</b> deviance grows with the size of the count, so without it one 2,000-like post would outweigh hundreds of 5-like posts. \(c_a\) is fixed before the week starts, so dividing by it changes the scale without changing what the best report is.</p>
+
+    <h3>The 2-day timescale</h3>
+    <p>Every loss is also scored on 2-day windows of the same 8 futures (the simulation is not restarted) and averaged over the windows. Seven days give six windows, one starting on each of days 1–6, so no day is dropped: \(W_1\) = days 1–2, \(W_2\) = days 2–3, …, \(W_6\) = days 6–7. Days 2–6 fall in two windows, days 1 and 7 in one. The headline likes losses only look at the week's totals; the 2-day versions also check when the likes came. The headline follower loss looks at single days; the 2-day version forgives a follow landing a day early or late but still checks the 2-day totals.</p>
+    <div class="steps">
+      <div class="lab">Loss 1, per window</div><div class="eq">\( \displaystyle S_{q,w} \;=\; \dfrac{1}{\max(L_{q,w},\,1)} \sum_{u \in U_{q,w}} \big(p_{u,q,w} - y_{u,q,w}\big)^2 \)</div>
+      <div class="lab">Loss 1, 2-day</div><div class="eq">\( \displaystyle L_1^{\text{2d}} \;=\; \dfrac{1}{|G|}\sum_{g \in G}\; \dfrac{1}{|A_g|}\sum_{a \in A_g}\; \dfrac{1}{|W_a|}\sum_{w \in W_a}\; \dfrac{1}{|Q_{a,w}|}\sum_{q \in Q_{a,w}} S_{q,w} \)</div>
+      <div class="lab">Loss 2, per window</div><div class="eq">\( \displaystyle D_{a,w} \;=\; \sum_{s \in S} \operatorname{CRPS}\big(x^{(s)}_{a,w},\, y^{(s)}_{a,w}\big) \)</div>
+      <div class="lab">Loss 2, 2-day</div><div class="eq">\( \displaystyle L_2^{\text{2d}} \;=\; \dfrac{1}{|G|}\sum_{g \in G}\; \dfrac{1}{|A_g|}\sum_{a \in A_g}\; \dfrac{1}{6}\sum_{w=1}^{6} D_{a,w} \)</div>
+      <div class="lab">Loss 3, 2-day</div><div class="eq">\( \displaystyle L_3^{\text{2d}} \;=\; \dfrac{1}{|G|}\sum_{g \in G}\; \dfrac{1}{|A_g|}\sum_{a \in A_g}\; \dfrac{1}{|W_a|}\sum_{w \in W_a} \dfrac{1}{|Q_{a,w}|}\sum_{q \in Q_{a,w}} \dfrac{D_{q,w}}{c_a} \)</div>
+    </div>
+    <dl class="defs">
+      <dt>\(W_w\)</dt><dd>window \(w\) = days \(w\) and \(w{+}1\), \(w = 1,\dots,6\)</dd>
+      <dt>\(Q_{a,w}\)</dt><dd>account \(a\)'s held-out posts made before the end of \(W_w\) (posts that exist during the window, older ones included)</dd>
+      <dt>\(W_a\)</dt><dd>the windows in which account \(a\) has at least one such post</dd>
+      <dt>likes, 2-day</dt><dd>only likes made inside \(W_w\) count: \(y_{u,q,w}\), \(p_{u,q,w}\), \(U_{q,w}\) and \(L_{q,w}\) are Loss 1's quantities restricted to likes in the window; \(D_{q,w}\) is Loss 3's deviance on the window's real and simulated like counts, same floor, same \(c_a\)</dd>
+      <dt>followers, 2-day</dt><dd>each of the six series is summed over the window's two days, then \(\log(1+\cdot)\) and fair CRPS exactly as in Loss 2</dd>
+      <dt>empty windows</dt><dd>a post with no likes in a window, real or simulated, scores 0 there and still counts in the average, the same for every simulation</dd>
+    </dl>
+
     <h3>Bars on the leaderboard</h3>
-    <p>Bar height is \(e^{-\text{loss}}\): 1.0 for perfect, 0.5 at a loss of 0.69, 0.25 at 1.39. Entries are ordered by \(\tfrac{1}{2}\big(e^{-L_1} + e^{-L_2}\big)\), highest first.</p>
+    <p>Bar height is \(e^{-\text{loss}}\): 1.0 for perfect, 0.5 at a loss of 0.69, 0.25 at 1.39. Entries are ordered by the average of \(e^{-\text{loss}}\) over all six numbers, \(\tfrac{1}{6}\sum_{i=1}^{3}\big(e^{-L_i} + e^{-L_i^{\text{2d}}}\big)\), highest first. Entries submitted before Sep 30, 2026 have only \(L_1\) and \(L_2\) at the headline timescale; they are listed after the complete entries, ordered by \(\tfrac{1}{2}\big(e^{-L_1} + e^{-L_2}\big)\).</p>
   </section>
 </div>
 
@@ -198,10 +260,19 @@
   <form class="modal" id="submit-form" novalidate>
     <h2>Submit a score</h2>
     <div class="field"><label>Model title</label><input name="title" maxlength="120" required placeholder="e.g. per-person v2, 12 layers, rollout loss"></div>
-    <div class="row2">
-      <div class="field"><label>Liker Brier <span class="hint">(likes loss, ≥ 0)</span></label><input name="l1" type="number" step="any" min="0" required placeholder="0.756"></div>
-      <div class="field"><label>Follower CRPS <span class="hint">(followers loss, ≥ 0)</span></label><input name="l2" type="number" step="any" min="0" required placeholder="0.176"></div>
+    <div class="sect">Headline timescale <span style="text-transform:none;letter-spacing:0;font-weight:400">· likes: whole week · followers: each day</span></div>
+    <div class="row3">
+      <div class="field"><label>Liker Brier</label><input name="l1" type="number" step="any" min="0" required placeholder="≥ 0"></div>
+      <div class="field"><label>Follower CRPS</label><input name="l2" type="number" step="any" min="0" required placeholder="≥ 0"></div>
+      <div class="field"><label>Like-count Poisson</label><input name="l3" type="number" step="any" min="0" required placeholder="≥ 0"></div>
     </div>
+    <div class="sect">2-day windows <span style="text-transform:none;letter-spacing:0;font-weight:400">· averaged over the six</span></div>
+    <div class="row3">
+      <div class="field"><label>Liker Brier</label><input name="l1d" type="number" step="any" min="0" required placeholder="≥ 0"></div>
+      <div class="field"><label>Follower CRPS</label><input name="l2d" type="number" step="any" min="0" required placeholder="≥ 0"></div>
+      <div class="field"><label>Like-count Poisson</label><input name="l3d" type="number" step="any" min="0" required placeholder="≥ 0"></div>
+    </div>
+    <p style="font-size:.82rem;color:var(--muted);margin:0 0 12px">Definitions: the “How the losses are computed” tab.</p>
     <div class="field"><label>How it works <span class="hint">(shown under the entry)</span></label><textarea name="desc" placeholder="What the model is, what it reads, how it was trained, what changed from the last one."></textarea></div>
     <div class="field"><label>Your name <span class="hint">(optional)</span></label><input name="by" maxlength="60"></div>
     <div class="actions">
@@ -223,7 +294,22 @@
   const REST = cfg.supabaseUrl + '/rest/v1';
   const $ = id => document.getElementById(id);
   const fmt = v => (v == null ? '—' : (Math.abs(v) >= 10 ? v.toFixed(2) : v.toFixed(3)));
-  const score = r => 0.5 * (Math.exp(-r.likes_loss) + Math.exp(-r.followers_loss));
+  // the three losses; `key` = headline timescale, `key2` = 2-day windows
+  const LOSSES = [
+    { key: 'likes_loss',     key2: 'likes_loss_2d',     cls: 'likes',  short: 'l1', name: 'Liker Brier' },
+    { key: 'followers_loss', key2: 'followers_loss_2d', cls: 'follow', short: 'l2', name: 'Follower CRPS' },
+    { key: 'poisson_loss',   key2: 'poisson_loss_2d',   cls: 'pois',   short: 'l3', name: 'Like-count Poisson' },
+  ];
+  const has = v => v != null;
+  const vals = r => LOSSES.flatMap(L => [r[L.key], r[L.key2]]).filter(has);
+  const complete = r => vals(r).length === 6;
+  // average of e^-loss over the numbers the entry has (six; two for entries from before Sep 30 2026)
+  const score = r => { const v = vals(r); return v.reduce((t, x) => t + Math.exp(-x), 0) / v.length; };
+  const ranked = rows => {
+    const by = (a, b) => score(b) - score(a);
+    return rows.filter(complete).sort(by).concat(rows.filter(r => !complete(r)).sort(by));
+  };
+  const lowest = (rows, k) => rows.filter(r => has(r[k])).reduce((a, r) => (!a || r[k] < a[k]) ? r : a, null);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const day = iso => new Date(iso).toLocaleDateString(undefined, {year:'numeric', month:'short', day:'numeric'});
 
@@ -253,31 +339,65 @@
 
   function render(rows){
     // best cards
-    const b1 = rows.length ? rows.reduce((a, r) => r.likes_loss < a.likes_loss ? r : a) : null;
-    const b2 = rows.length ? rows.reduce((a, r) => r.followers_loss < a.followers_loss ? r : a) : null;
-    $('best-l1').textContent = b1 ? fmt(b1.likes_loss) : '—';
-    $('best-l1-who').textContent = b1 ? b1.model_title + ' · ' + day(b1.created_at) : 'no scores yet';
-    $('best-l2').textContent = b2 ? fmt(b2.followers_loss) : '—';
-    $('best-l2-who').textContent = b2 ? b2.model_title + ' · ' + day(b2.created_at) : 'no scores yet';
+    LOSSES.forEach(L => {
+      const b = lowest(rows, L.key), b2 = lowest(rows, L.key2);
+      $('best-' + L.short).textContent = b ? fmt(b[L.key]) : '—';
+      $('best-' + L.short + '-who').textContent = b ? b.model_title + ' · ' + day(b.created_at) : 'no scores yet';
+      $('best-' + L.short + '-2d').textContent = b2 ? fmt(b2[L.key2]) : '—';
+      $('best-' + L.short + '-2d-who').textContent = b2 ? '· ' + b2.model_title : '';
+    });
 
-    // chart, chronological
-    const chart = $('chart');
-    const bestId = rows.length ? rows.reduce((a, r) => score(r) > score(a) ? r : a).id : null;
+    const order = ranked(rows);
+    const bestId = order.length ? order[0].id : null;
+    drawChart($('chart'), rows, 'key', bestId, 'No scores yet.');
+    drawChart($('chart2d'), rows.filter(r => LOSSES.some(L => has(r[L.key2]))), 'key2', bestId, 'No 2-day scores yet.');
+
+    // entries: complete ones best first, then the two-loss entries from before Sep 30 2026
+    const cell = (r, k, c) => has(r[k]) ? '<td class="' + c + '">' + fmt(r[k]) + '</td>' : '<td class="na">—</td>';
+    let rank = 0, olderShown = false;
+    $('entries').innerHTML = order.length ? order.map(r => {
+      const full = complete(r);
+      let head = '';
+      if (!full && !olderShown) {
+        olderShown = true;
+        head = '<div class="older">Submitted before Sep 30, 2026: Liker Brier and Follower CRPS at the headline timescale only.</div>';
+      }
+      return head + '<div class="entry" data-id="' + r.id + '">' +
+        '<div class="top">' +
+          '<div><span class="rank">' + (full ? '#' + (++rank) : '–') + '</span><span class="title">' + esc(r.model_title) + '</span>' +
+            '<div class="meta">' + day(r.created_at) + (r.submitted_by ? ' · ' + esc(r.submitted_by) : '') + ' · combined ' + score(r).toFixed(3) + '</div></div>' +
+          '<table class="nt"><thead><tr><th></th>' + LOSSES.map(L => '<th>' + L.name + '</th>').join('') + '</tr></thead><tbody>' +
+            '<tr><th>headline</th>' + LOSSES.map(L => cell(r, L.key, L.short)).join('') + '</tr>' +
+            '<tr><th>2-day</th>' + LOSSES.map(L => cell(r, L.key2, L.short)).join('') + '</tr>' +
+          '</tbody></table>' +
+        '</div>' +
+        (r.description ? '<div class="desc">' + esc(r.description) + '</div>' : '') +
+        '<button class="rm" data-id="' + r.id + '">remove</button>' +
+      '</div>';
+    }).join('') : '<div class="empty">No submissions yet. Be the first.</div>';
+    document.querySelectorAll('.rm').forEach(b => b.addEventListener('click', () => remove(b.dataset.id)));
+  }
+
+  // one bar group per entry, chronological; `which` picks the headline ('key') or 2-day ('key2') columns
+  function drawChart(chart, rows, which, bestId, emptyText){
     const H_PX = 220;
     let html = '';
-    if (!rows.length) html += '<div class="empty" style="width:100%;align-self:center">No scores yet.</div>';
+    if (!rows.length) html += '<div class="empty" style="width:100%;align-self:center">' + emptyText + '</div>';
     rows.forEach(r => {
-      const h1 = Math.max(2, Math.exp(-r.likes_loss) * H_PX), h2 = Math.max(2, Math.exp(-r.followers_loss) * H_PX);
-      html += '<div class="group' + (r.id === bestId ? ' best' : '') + '">' +
-        '<div class="bars">' +
-          '<div class="bar likes" style="height:' + h1.toFixed(1) + 'px"><span class="n">' + fmt(r.likes_loss) + '</span></div>' +
-          '<div class="bar follow" style="height:' + h2.toFixed(1) + 'px"><span class="n">' + fmt(r.followers_loss) + '</span></div>' +
+      html += '<div class="group' + (r.id === bestId ? ' best' : '') + '"><div class="bars">' +
+        LOSSES.map(L => {
+          const v = r[L[which]];
+          return has(v)
+            ? '<div class="bar ' + L.cls + '" title="' + L.name + '" style="height:' + Math.max(2, Math.exp(-v) * H_PX).toFixed(1) + 'px"><span class="n">' + fmt(v) + '</span></div>'
+            : '<div class="bar na" title="' + L.name + ': not reported" style="height:2px"><span class="n">—</span></div>';
+        }).join('') +
         '</div>' +
         '<div class="t" title="' + esc(r.model_title) + '">' + esc(r.model_title) + '</div>' +
         '<div class="d">' + day(r.created_at) + '</div>' +
       '</div>';
     });
     chart.innerHTML = html;
+    if (!rows.length) return;
     // guide lines, positioned from the measured base of the bars so they stay aligned whatever the font does
     const bars = chart.querySelector('.bars');
     const base = bars ? chart.getBoundingClientRect().bottom - bars.getBoundingClientRect().bottom : 48;
@@ -286,29 +406,15 @@
       g.style.bottom = (f * H_PX + base) + 'px'; g.innerHTML = '<span>' + lab + '</span>';
       chart.appendChild(g);
     });
-
-    // entries, best first
-    const sorted = rows.slice().sort((a, b) => score(b) - score(a));
-    $('entries').innerHTML = sorted.length ? sorted.map((r, i) =>
-      '<div class="entry" data-id="' + r.id + '">' +
-        '<div class="top">' +
-          '<div><span class="rank">#' + (i + 1) + '</span><span class="title">' + esc(r.model_title) + '</span>' +
-            '<div class="meta">' + day(r.created_at) + (r.submitted_by ? ' · ' + esc(r.submitted_by) : '') + ' · combined ' + score(r).toFixed(3) + '</div></div>' +
-          '<div class="nums"><span class="l1">Liker Brier <b>' + fmt(r.likes_loss) + '</b></span> &nbsp; <span class="l2">Follower CRPS <b>' + fmt(r.followers_loss) + '</b></span></div>' +
-        '</div>' +
-        (r.description ? '<div class="desc">' + esc(r.description) + '</div>' : '') +
-        '<button class="rm" data-id="' + r.id + '">remove</button>' +
-      '</div>').join('') : '<div class="empty">No submissions yet. Be the first.</div>';
-    document.querySelectorAll('.rm').forEach(b => b.addEventListener('click', () => remove(b.dataset.id)));
   }
 
-  async function rpc(name, body, _retried){
+  async function rpc(name, body){
     const r = await fetch(REST + '/rpc/' + name, { method: 'POST', headers: H, body: JSON.stringify(body) });
     if (!r.ok) {
       let msg = 'error ' + r.status, code = '';
       try { const j = await r.json(); msg = j.message || j.hint || msg; code = j.code || ''; } catch (e) {}
-      // older database still has the code-checking functions: call those instead
-      if (!_retried && code === 'PGRST202') return rpc(name, { p_code: 'violet-ember-tundra-62', ...body }, true);
+      // database still has the two-loss function: supabase/schema.sql has not been re-run yet
+      if (code === 'PGRST202') msg = 'The database has not been upgraded to six losses yet. Run supabase/schema.sql from the repo once in the Supabase SQL editor.';
       throw new Error(msg);
     }
     return r.status === 204 ? null : r.json();
@@ -332,14 +438,16 @@
     e.preventDefault();
     err.textContent = '';
     const f = form.elements;
-    const l1 = parseFloat(f.l1.value), l2 = parseFloat(f.l2.value);
+    const v = {}; ['l1', 'l2', 'l3', 'l1d', 'l2d', 'l3d'].forEach(k => v[k] = parseFloat(f[k].value));
     if (!f.title.value.trim()) return err.textContent = 'Model title is required.';
-    if (!(l1 >= 0) || !(l2 >= 0)) return err.textContent = 'Both losses must be numbers ≥ 0.';
+    if (!Object.values(v).every(x => x >= 0)) return err.textContent = 'All six losses must be numbers ≥ 0.';
     $('do-submit').disabled = true;
     try {
       await rpc('benchmaxxing_submit', {
         p_model_title: f.title.value.trim(), p_description: f.desc.value.trim(),
-        p_likes_loss: l1, p_followers_loss: l2, p_submitted_by: f.by.value.trim() || null
+        p_likes_loss: v.l1, p_followers_loss: v.l2, p_poisson_loss: v.l3,
+        p_likes_loss_2d: v.l1d, p_followers_loss_2d: v.l2d, p_poisson_loss_2d: v.l3d,
+        p_submitted_by: f.by.value.trim() || null
       });
       form.reset(); close(); await load();
       document.querySelector('.tab[data-tab="board"]').click();
