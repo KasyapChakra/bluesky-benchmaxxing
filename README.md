@@ -3,7 +3,7 @@
 Live at https://blueskybenchmaxxing.com
 
 Public leaderboard for the one-week English Bluesky simulation benchmark
-(holdout week Sep 18–25 2026, 8 futures). Three losses, each at two
+(holdout week Sep 18–25 2026). Three losses, each at two
 timescales (six numbers per entry): per-liker Brier on likes, size-band CRPS
 on follower counts, Poisson deviance on like counts; headline timescale
 (likes: whole week, followers: per day) and 2-day windows (days 1–2 … 6–7,

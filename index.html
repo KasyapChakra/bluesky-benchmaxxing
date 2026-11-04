@@ -121,7 +121,7 @@
     <h1>Bluesky Benchmaxxing</h1>
     <button class="btn" id="open-submit">Submit a score</button>
   </header>
-  <p class="sub">One simulated week of English Bluesky (Sep 18–25, 2026, 8 futures). Three losses, each at two timescales. Lower is better.</p>
+  <p class="sub">One simulated week of English Bluesky (Sep 18–25, 2026). Three losses, each at two timescales. Lower is better.</p>
 
   <div class="tabs">
     <button class="tab active" data-tab="board">Leaderboard</button>
@@ -148,7 +148,7 @@
       </div>
       <div class="card pois">
         <div class="name">Like-count Poisson <span style="color:var(--muted);font-weight:400">· how many likes</span></div>
-        <div class="what">Poisson deviance of each post's like count against the futures' average ÷ the account's usual likes · 0 = perfect · ≈ 0.4–0.6 = off by 2×</div>
+        <div class="what">Poisson deviance of each post's like count against its expected count ÷ the account's usual likes · 0 = perfect · ≈ 0.4–0.6 = off by 2×</div>
         <div class="val" id="best-l3">—</div>
         <div class="who" id="best-l3-who"></div>
         <div class="two">2-day: <b id="best-l3-2d">—</b> <span id="best-l3-2d-who"></span></div>
@@ -174,31 +174,30 @@
   </section>
 
   <section class="panel formulas" id="panel-how">
-    <p class="lead">One week of English Bluesky, Sep 18–25, 2026 (days 1–7 are UTC days, day 1 = Sep 18). Everything the held-out accounts did that week and real news-account posts are copied into the simulation at the real moment; the rest of the network is simulated, \(K = 8\) times with different seeds. Three losses: who liked each post (Loss 1), how many followers each account gained and lost (Loss 2), and how many likes each post got (Loss 3). Each is reported at its headline timescale and again on 2-day windows, so every entry has six numbers. Lower is better, 0 is perfect, none is capped.</p>
+    <p class="lead">One week of English Bluesky, Sep 18–25, 2026 (days 1–7 are UTC days, day 1 = Sep 18). Everything the held-out accounts did that week and real news-account posts are copied into the simulation at the real moment; the rest of the network is simulated, with no required number of runs: each loss scores the chances and counts an entry reports. Older entries report averages over 8 runs, which adds some sampling noise. Three losses: who liked each post (Loss 1), how many followers each account gained and lost (Loss 2), and how many likes each post got (Loss 3). Each is reported at its headline timescale and again on 2-day windows, so every entry has six numbers. Lower is better, 0 is perfect, none is capped.</p>
 
     <h3>Loss 1 — Liker Brier <span class="dim">(likes)</span></h3>
     <p>For every held-out post: did each person like it, and how sure was the simulation? Scored once per post at the end of the week.</p>
     <div class="steps">
-      <div class="lab">per person</div><div class="eq">\( \displaystyle p_{u,q} \;=\; \dfrac{1}{K}\sum_{k=1}^{K} \mathbf{1}\big[\,u \text{ liked } q \text{ in future } k\,\big] \)</div>
       <div class="lab">per post</div><div class="eq">\( \displaystyle S_q \;=\; \dfrac{1}{\max(L_q,\,1)} \sum_{u \in U_q} \big(p_{u,q} - y_{u,q}\big)^2 \)</div>
       <div class="lab">overall</div><div class="eq">\( \displaystyle L_1 \;=\; \dfrac{1}{|G|}\sum_{g \in G}\; \dfrac{1}{|A_g|}\sum_{a \in A_g}\; \dfrac{1}{|Q_a|}\sum_{q \in Q_a} S_q \)</div>
     </div>
     <dl class="defs">
       <dt>\(q\)</dt><dd>a held-out post (replies count too); \(Q_a\) the posts of account \(a\)</dd>
-      <dt>\(U_q\)</dt><dd>everyone who liked \(q\) in reality or in at least one future. Anyone else contributes exactly 0</dd>
-      <dt>\(p_{u,q}\)</dt><dd>share of the 8 futures in which person \(u\) liked \(q\): the simulation's probability, in eighths</dd>
+      <dt>\(U_q\)</dt><dd>everyone who liked \(q\) in reality or has \(p_{u,q} > 0\). Anyone else contributes exactly 0</dd>
+      <dt>\(p_{u,q}\)</dt><dd>the simulation's probability that person \(u\) likes \(q\), any number from 0 to 1</dd>
       <dt>\(y_{u,q}\)</dt><dd>1 if \(u\) really liked \(q\), else 0</dd>
       <dt>\((p-y)^2\)</dt><dd>Brier score for that person. Misses \((1-p)^2\) over real likers, false alarms \(p^2\) over the rest</dd>
       <dt>\(L_q\)</dt><dd>the post's real like count; \(\max(L_q,1)\) only avoids dividing by zero</dd>
       <dt>\(G,\;A_g\)</dt><dd>the sampling groups and the held-out accounts in each; every group weighs the same</dd>
     </dl>
-    <p class="read"><b>Reading it:</b> 0 = every liker right in every future · 1 = produced no likes at all · 2 = right count, all the wrong people.</p>
-    <p class="why"><b>Why squared:</b> plain distance \(|p-y|\) is minimised by rounding every person to 0 or 1, which throws away the uncertainty the futures exist to capture. Squaring charges a full 1 for confidently wrong and 0.09 for saying 30% to someone who didn't like it, so the best report is the true chance. <b>Why divide by \(L_q\):</b> otherwise one 2,000-like post outweighs 400 five-like posts. Dividing by reality only (never by anything the simulation controls) keeps it ungameable.</p>
+    <p class="read"><b>Reading it:</b> 0 = every liker right with full certainty · 1 = produced no likes at all · 2 = right count, all the wrong people.</p>
+    <p class="why"><b>Why squared:</b> plain distance \(|p-y|\) is minimised by rounding every person to 0 or 1, which throws away the uncertainty. Squaring charges a full 1 for confidently wrong and 0.09 for saying 30% to someone who didn't like it, so the best report is the true chance. <b>Why divide by \(L_q\):</b> otherwise one 2,000-like post outweighs 400 five-like posts. Dividing by reality only (never by anything the simulation controls) keeps it ungameable.</p>
 
     <h3>Loss 2 — Follower CRPS <span class="dim">(followers)</span></h3>
-    <p>For every held-out account and day: how many followers it gained and lost, split by the follower's size. The exact person is not scored (under 1% per person, 8 futures can't see it); the kind of account is.</p>
+    <p>For every held-out account and day: how many followers it gained and lost, split by the follower's size. The exact person is not scored (under 1% per person, too rare to score); the kind of account is.</p>
     <div class="steps">
-      <div class="lab">log counts</div><div class="eq">\( \displaystyle y \;=\; \log(1 + \text{real count}) \qquad x_k \;=\; \log(1 + \text{count in future } k) \)</div>
+      <div class="lab">log counts</div><div class="eq">\( \displaystyle y \;=\; \log(1 + \text{real count}) \qquad x_k \;=\; \log(1 + \text{forecast count } k) \)</div>
       <div class="lab">per series</div><div class="eq">\( \displaystyle \operatorname{CRPS}(x, y) \;=\; \dfrac{1}{K}\sum_{k=1}^{K} |x_k - y| \;-\; \dfrac{1}{2K(K-1)} \sum_{k \neq j} |x_k - x_j| \)</div>
       <div class="lab">per day</div><div class="eq">\( \displaystyle D_{a,d} \;=\; \sum_{s \in S} \operatorname{CRPS}\big(x^{(s)}_{a,d},\, y^{(s)}_{a,d}\big) \)</div>
       <div class="lab">overall</div><div class="eq">\( \displaystyle L_2 \;=\; \dfrac{1}{|G|}\sum_{g \in G}\; \dfrac{1}{|A_g|}\sum_{a \in A_g}\; \dfrac{1}{7}\sum_{d=1}^{7} D_{a,d} \)</div>
@@ -206,26 +205,25 @@
     <dl class="defs">
       <dt>\(S\)</dt><dd>six series per account per day: new followers from accounts with &lt;1K, 1K–10K, &gt;10K followers, and unfollows in the same three bands (size read at the start of the week)</dd>
       <dt>\(y,\;x_k\)</dt><dd>real and simulated counts on a log scale, so a distance of 0.69 means "off by 2×" whether the day had 10 followers or 1,000</dd>
-      <dt>first term</dt><dd>average distance of the 8 futures from reality</dd>
-      <dt>second term</dt><dd>half the average distance between futures: the credit for honest spread</dd>
-      <dt>\(K(K-1)\)</dt><dd>pairs over \(k \neq j\), the "fair" form, unbiased at any number of futures</dd>
+      <dt>first term</dt><dd>average distance of the forecast counts from reality</dd>
+      <dt>second term</dt><dd>half the average distance between those counts: the credit for honest spread</dd>
+      <dt>\(K(K-1)\)</dt><dd>pairs over \(k \neq j\), the "fair" form, unbiased at any number of counts \(K \ge 2\); a single count scores plain \(|x-y|\)</dd>
       <dt>\(d\)</dt><dd>day of the week, 1–7; \(D_{a,d}\) the six CRPS values added</dd>
     </dl>
-    <p class="read"><b>Reading it:</b> stays in log units · 0 = every daily count exactly right · 0.69 ≈ typically off by 2× · 2.3 ≈ off by 10×. When all 8 futures agree, CRPS is plain \(|x-y|\).</p>
-    <p class="why"><b>Why subtract half the spread:</b> the first term alone is minimised by collapsing all 8 futures onto one value. Subtracting half the spread makes a forecast shaped like reality the best one; subtracting all of it would let a scattered forecast score below zero. <b>Why log, not percent:</b> percent error is lopsided and caps at 1, so a 10× miss and a 1,000× miss look the same; log keeps counting, which is where the growth accounts live.</p>
+    <p class="read"><b>Reading it:</b> stays in log units · 0 = every daily count exactly right · 0.69 ≈ typically off by 2× · 2.3 ≈ off by 10×. When all counts agree, CRPS is plain \(|x-y|\).</p>
+    <p class="why"><b>Why subtract half the spread:</b> the first term alone is minimised by collapsing all counts onto one value. Subtracting half the spread makes a forecast shaped like reality the best one; subtracting all of it would let a scattered forecast score below zero. <b>Why log, not percent:</b> percent error is lopsided and caps at 1, so a 10× miss and a 1,000× miss look the same; log keeps counting, which is where the growth accounts live.</p>
 
     <h3>Loss 3 — Like-count Poisson <span class="dim">(likes, how many)</span></h3>
     <p>For every held-out post: how many likes did it get, against the simulation's expected count? Loss 1 checks who liked; this checks how many. Scored once per post at the end of the week.</p>
     <div class="steps">
-      <div class="lab">expected</div><div class="eq">\( \displaystyle \lambda_q \;=\; \dfrac{1}{K}\sum_{k=1}^{K} n_{q,k} \qquad \tilde\lambda_q \;=\; \begin{cases} \max\!\big(\lambda_q,\, \tfrac{1}{2K}\big) & y_q > 0 \\ \lambda_q & y_q = 0 \end{cases} \)</div>
+      <div class="lab">floor</div><div class="eq">\( \displaystyle \tilde\lambda_q \;=\; \begin{cases} \max\!\big(\lambda_q,\, \tfrac{1}{16}\big) & y_q > 0 \\ \lambda_q & y_q = 0 \end{cases} \)</div>
       <div class="lab">per post</div><div class="eq">\( \displaystyle D_q \;=\; 2\Big(\, y_q \log \dfrac{y_q}{\tilde\lambda_q} \;-\; y_q \;+\; \tilde\lambda_q \Big) \qquad (0 \log 0 = 0) \)</div>
       <div class="lab">overall</div><div class="eq">\( \displaystyle L_3 \;=\; \dfrac{1}{|G|}\sum_{g \in G}\; \dfrac{1}{|A_g|}\sum_{a \in A_g}\; \dfrac{1}{|Q_a|}\sum_{q \in Q_a} \dfrac{D_q}{c_a} \)</div>
     </div>
     <dl class="defs">
-      <dt>\(n_{q,k}\)</dt><dd>likes post \(q\) got by the end of the week in future \(k\)</dd>
       <dt>\(y_q\)</dt><dd>likes \(q\) really got by the end of the week (the same count as \(L_q\) in Loss 1)</dd>
-      <dt>\(\lambda_q\)</dt><dd>the simulation's expected like count: the average over the 8 futures. Only the average enters this loss; the spread across futures does not</dd>
-      <dt>\(\tilde\lambda_q\)</dt><dd>\(\lambda_q\) with a floor of \(\tfrac{1}{16}\) (half a like across 8 futures), used only when the post really got likes. A liked post that got zero likes in every future pays a large but finite price; a correct zero still costs nothing</dd>
+      <dt>\(\lambda_q\)</dt><dd>the simulation's expected like count, any number \(\ge 0\)</dd>
+      <dt>\(\tilde\lambda_q\)</dt><dd>\(\lambda_q\) with a floor of \(\tfrac{1}{16}\), used only when the post really got likes. A liked post forecast at zero pays a large but finite price; a correct zero still costs nothing</dd>
       <dt>\(D_q\)</dt><dd>Poisson deviance: twice the gap in Poisson log-likelihood between the simulation's rate and the perfect rate \(y_q\). It is 0 only when \(\lambda_q = y_q\); for a post with no real likes it is \(2\lambda_q\)</dd>
       <dt>\(c_a\)</dt><dd>account \(a\)'s usual likes per post before the week: likes received ÷ posts made (replies count) over Aug 28–Sep 17, 2026, floored at 1; 1 if it made no posts then</dd>
       <dt>\(G,\;A_g,\;Q_a\)</dt><dd>as in Loss 1: groups weigh the same, accounts within a group weigh the same, posts within an account weigh the same</dd>
@@ -234,7 +232,7 @@
     <p class="why"><b>Why Poisson deviance:</b> it is the Poisson log-likelihood shifted so a perfect count scores 0, and its best report is the true expected count, so a simulator cannot gain by shading its counts up or down. It is the count companion to Loss 1: a simulation that gives a post the right number of likes from the wrong people does well here and badly there. <b>Why divide by \(c_a\):</b> deviance grows with the size of the count, so without it one 2,000-like post would outweigh hundreds of 5-like posts. \(c_a\) is fixed before the week starts, so dividing by it changes the scale without changing what the best report is.</p>
 
     <h3>The 2-day timescale</h3>
-    <p>Every loss is also scored on 2-day windows of the same 8 futures (the simulation is not restarted) and averaged over the windows. Seven days give six windows, one starting on each of days 1–6, so no day is dropped: \(W_1\) = days 1–2, \(W_2\) = days 2–3, …, \(W_6\) = days 6–7. Days 2–6 fall in two windows, days 1 and 7 in one. The headline likes losses only look at the week's totals; the 2-day versions also check when the likes came. The headline follower loss looks at single days; the 2-day version forgives a follow landing a day early or late but still checks the 2-day totals.</p>
+    <p>Every loss is also scored on 2-day windows of the same forecast and averaged over the windows. Seven days give six windows, one starting on each of days 1–6, so no day is dropped: \(W_1\) = days 1–2, \(W_2\) = days 2–3, …, \(W_6\) = days 6–7. Days 2–6 fall in two windows, days 1 and 7 in one. The headline likes losses only look at the week's totals; the 2-day versions also check when the likes came. The headline follower loss looks at single days; the 2-day version forgives a follow landing a day early or late but still checks the 2-day totals.</p>
     <div class="steps">
       <div class="lab">Loss 1, per window</div><div class="eq">\( \displaystyle S_{q,w} \;=\; \dfrac{1}{\max(L_{q,w},\,1)} \sum_{u \in U_{q,w}} \big(p_{u,q,w} - y_{u,q,w}\big)^2 \)</div>
       <div class="lab">Loss 1, 2-day</div><div class="eq">\( \displaystyle L_1^{\text{2d}} \;=\; \dfrac{1}{|G|}\sum_{g \in G}\; \dfrac{1}{|A_g|}\sum_{a \in A_g}\; \dfrac{1}{|W_a|}\sum_{w \in W_a}\; \dfrac{1}{|Q_{a,w}|}\sum_{q \in Q_{a,w}} S_{q,w} \)</div>
