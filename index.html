@@ -134,7 +134,7 @@
     <div class="bests">
       <div class="card likes">
         <div class="name">Liker Brier <span style="color:var(--muted);font-weight:400">· who liked</span></div>
-        <div class="what">per-person Brier over likers ÷ real likes · 0 = perfect · 1 = produced nothing</div>
+        <div class="what">per-person Brier over likers ÷ the group's usual likes · 0 = perfect · 1.12 = named no one</div>
         <div class="val" id="best-l1">—</div>
         <div class="who" id="best-l1-who"></div>
         <div class="two">2-day: <b id="best-l1-2d">—</b> <span id="best-l1-2d-who"></span></div>
@@ -148,7 +148,7 @@
       </div>
       <div class="card pois">
         <div class="name">Like-count Poisson <span style="color:var(--muted);font-weight:400">· how many likes</span></div>
-        <div class="what">Poisson deviance of each post's like count against its expected count ÷ the account's usual likes · 0 = perfect · ≈ 0.4–0.6 = off by 2×</div>
+        <div class="what">Poisson deviance of each post's like count against its expected count ÷ the group's usual likes · 0 = perfect · ≈ 0.4–0.6 = off by 2×</div>
         <div class="val" id="best-l3">—</div>
         <div class="who" id="best-l3-who"></div>
         <div class="two">2-day: <b id="best-l3-2d">—</b> <span id="best-l3-2d-who"></span></div>
@@ -179,7 +179,7 @@
     <h3>Loss 1 — Liker Brier <span class="dim">(likes)</span></h3>
     <p>For every held-out post: did each person like it, and how sure was the simulation? Scored once per post at the end of the week.</p>
     <div class="steps">
-      <div class="lab">per post</div><div class="eq">\( \displaystyle S_q \;=\; \dfrac{1}{\max(L_q,\,1)} \sum_{u \in U_q} \big(p_{u,q} - y_{u,q}\big)^2 \)</div>
+      <div class="lab">per post</div><div class="eq">\( \displaystyle S_q \;=\; \dfrac{1}{c_g} \sum_{u \in U_q} \big(p_{u,q} - y_{u,q}\big)^2 \)</div>
       <div class="lab">overall</div><div class="eq">\( \displaystyle L_1 \;=\; \dfrac{1}{|G|}\sum_{g \in G}\; \dfrac{1}{|A_g|}\sum_{a \in A_g}\; \dfrac{1}{|Q_a|}\sum_{q \in Q_a} S_q \)</div>
     </div>
     <dl class="defs">
@@ -188,11 +188,11 @@
       <dt>\(p_{u,q}\)</dt><dd>the simulation's probability that person \(u\) likes \(q\), any number from 0 to 1</dd>
       <dt>\(y_{u,q}\)</dt><dd>1 if \(u\) really liked \(q\), else 0</dd>
       <dt>\((p-y)^2\)</dt><dd>Brier score for that person. Misses \((1-p)^2\) over real likers, false alarms \(p^2\) over the rest</dd>
-      <dt>\(L_q\)</dt><dd>the post's real like count; \(\max(L_q,1)\) only avoids dividing by zero</dd>
+      <dt>\(c_g\)</dt><dd>the usual likes per post before the week of the group \(g\) that \(q\)'s account is in: the average of \(c_a\) over the group's accounts. \(c_a\) is likes received ÷ posts made (replies count) over Aug 28–Sep 17, 2026, floored at 1; 1 if the account made no posts then</dd>
       <dt>\(G,\;A_g\)</dt><dd>the sampling groups and the held-out accounts in each; every group weighs the same</dd>
     </dl>
-    <p class="read"><b>Reading it:</b> 0 = every liker right with full certainty · 1 = produced no likes at all · 2 = right count, all the wrong people.</p>
-    <p class="why"><b>Why squared:</b> plain distance \(|p-y|\) is minimised by rounding every person to 0 or 1, which throws away the uncertainty. Squaring charges a full 1 for confidently wrong and 0.09 for saying 30% to someone who didn't like it, so the best report is the true chance. <b>Why divide by \(L_q\):</b> otherwise one 2,000-like post outweighs 400 five-like posts. Dividing by reality only (never by anything the simulation controls) keeps it ungameable.</p>
+    <p class="read"><b>Reading it:</b> 0 = every liker right with full certainty · 1.12 = named no one · 2.25 = right count, all the wrong people.</p>
+    <p class="why"><b>Why squared:</b> plain distance \(|p-y|\) is minimised by rounding every person to 0 or 1, which throws away the uncertainty. Squaring charges a full 1 for confidently wrong and 0.09 for saying 30% to someone who didn't like it, so the best report is the true chance. <b>Why divide by \(c_g\):</b> each group is its own test of the simulation, and groups of large accounts would otherwise outweigh the rest. One number per group puts the tests on one scale and divides nothing away inside a group, so missing every liker on a 2,000-like post costs 400 times as much as on a 5-like post. \(c_g\) comes from before the week and is the same for every entry, so the best report stays the true chance, apart from a small effect of groups being partly defined by the week's likes.</p>
 
     <h3>Loss 2 — Follower CRPS <span class="dim">(followers)</span></h3>
     <p>For every held-out account and day: how many followers it gained and lost, split by the follower's size. The exact person is not scored (under 1% per person, too rare to score); the kind of account is.</p>
@@ -218,39 +218,38 @@
     <div class="steps">
       <div class="lab">floor</div><div class="eq">\( \displaystyle \tilde\lambda_q \;=\; \begin{cases} \max\!\big(\lambda_q,\, \tfrac{1}{16}\big) & y_q > 0 \\ \lambda_q & y_q = 0 \end{cases} \)</div>
       <div class="lab">per post</div><div class="eq">\( \displaystyle D_q \;=\; 2\Big(\, y_q \log \dfrac{y_q}{\tilde\lambda_q} \;-\; y_q \;+\; \tilde\lambda_q \Big) \qquad (0 \log 0 = 0) \)</div>
-      <div class="lab">overall</div><div class="eq">\( \displaystyle L_3 \;=\; \dfrac{1}{|G|}\sum_{g \in G}\; \dfrac{1}{|A_g|}\sum_{a \in A_g}\; \dfrac{1}{|Q_a|}\sum_{q \in Q_a} \dfrac{D_q}{c_a} \)</div>
+      <div class="lab">overall</div><div class="eq">\( \displaystyle L_3 \;=\; \dfrac{1}{|G|}\sum_{g \in G}\; \dfrac{1}{|A_g|}\sum_{a \in A_g}\; \dfrac{1}{|Q_a|}\sum_{q \in Q_a} \dfrac{D_q}{c_g} \)</div>
     </div>
     <dl class="defs">
-      <dt>\(y_q\)</dt><dd>likes \(q\) really got by the end of the week (the same count as \(L_q\) in Loss 1)</dd>
+      <dt>\(y_q\)</dt><dd>likes \(q\) really got by the end of the week</dd>
       <dt>\(\lambda_q\)</dt><dd>the simulation's expected like count, any number \(\ge 0\)</dd>
       <dt>\(\tilde\lambda_q\)</dt><dd>\(\lambda_q\) with a floor of \(\tfrac{1}{16}\), used only when the post really got likes. A liked post forecast at zero pays a large but finite price; a correct zero still costs nothing</dd>
       <dt>\(D_q\)</dt><dd>Poisson deviance: twice the gap in Poisson log-likelihood between the simulation's rate and the perfect rate \(y_q\). It is 0 only when \(\lambda_q = y_q\); for a post with no real likes it is \(2\lambda_q\)</dd>
-      <dt>\(c_a\)</dt><dd>account \(a\)'s usual likes per post before the week: likes received ÷ posts made (replies count) over Aug 28–Sep 17, 2026, floored at 1; 1 if it made no posts then</dd>
-      <dt>\(G,\;A_g,\;Q_a\)</dt><dd>as in Loss 1: groups weigh the same, accounts within a group weigh the same, posts within an account weigh the same</dd>
+      <dt>\(c_g,\;G,\;A_g,\;Q_a\)</dt><dd>as in Loss 1: the group's usual likes per post; groups weigh the same, accounts within a group weigh the same, posts within an account weigh the same</dd>
     </dl>
-    <p class="read"><b>Reading it:</b> 0 = every post's expected count exactly right · for a post at the account's usual level, ≈ 0.61 = predicted 2× too many, ≈ 0.39 = predicted half as many · ≈ 13 = 10× too many, ≈ 2.8 = a tenth as many.</p>
-    <p class="why"><b>Why Poisson deviance:</b> it is the Poisson log-likelihood shifted so a perfect count scores 0, and its best report is the true expected count, so a simulator cannot gain by shading its counts up or down. It is the count companion to Loss 1: a simulation that gives a post the right number of likes from the wrong people does well here and badly there. <b>Why divide by \(c_a\):</b> deviance grows with the size of the count, so without it one 2,000-like post would outweigh hundreds of 5-like posts. \(c_a\) is fixed before the week starts, so dividing by it changes the scale without changing what the best report is.</p>
+    <p class="read"><b>Reading it:</b> 0 = every post's expected count exactly right · for a post at the group's usual level, ≈ 0.61 = predicted 2× too many, ≈ 0.39 = predicted half as many · ≈ 13 = 10× too many, ≈ 2.8 = a tenth as many.</p>
+    <p class="why"><b>Why Poisson deviance:</b> it is the Poisson log-likelihood shifted so a perfect count scores 0, and its best report is the true expected count, so a simulator cannot gain by shading its counts up or down. It is the count companion to Loss 1: a simulation that gives a post the right number of likes from the wrong people does well here and badly there. <b>Why divide by \(c_g\):</b> deviance grows with the size of the count, so groups of large accounts would otherwise outweigh the rest; inside a group, a bad miss on a big post still costs more than on a small one. As in Loss 1, the best report stays the true expected count, apart from the same small effect.</p>
 
     <h3>The 2-day timescale</h3>
     <p>Every loss is also scored on 2-day windows of the same forecast and averaged over the windows. Seven days give six windows, one starting on each of days 1–6, so no day is dropped: \(W_1\) = days 1–2, \(W_2\) = days 2–3, …, \(W_6\) = days 6–7. Days 2–6 fall in two windows, days 1 and 7 in one. The headline likes losses only look at the week's totals; the 2-day versions also check when the likes came. The headline follower loss looks at single days; the 2-day version forgives a follow landing a day early or late but still checks the 2-day totals.</p>
     <div class="steps">
-      <div class="lab">Loss 1, per window</div><div class="eq">\( \displaystyle S_{q,w} \;=\; \dfrac{1}{\max(L_{q,w},\,1)} \sum_{u \in U_{q,w}} \big(p_{u,q,w} - y_{u,q,w}\big)^2 \)</div>
+      <div class="lab">Loss 1, per window</div><div class="eq">\( \displaystyle S_{q,w} \;=\; \dfrac{1}{c_g} \sum_{u \in U_{q,w}} \big(p_{u,q,w} - y_{u,q,w}\big)^2 \)</div>
       <div class="lab">Loss 1, 2-day</div><div class="eq">\( \displaystyle L_1^{\text{2d}} \;=\; \dfrac{1}{|G|}\sum_{g \in G}\; \dfrac{1}{|A_g|}\sum_{a \in A_g}\; \dfrac{1}{|W_a|}\sum_{w \in W_a}\; \dfrac{1}{|Q_{a,w}|}\sum_{q \in Q_{a,w}} S_{q,w} \)</div>
       <div class="lab">Loss 2, per window</div><div class="eq">\( \displaystyle D_{a,w} \;=\; \sum_{s \in S} \operatorname{CRPS}\big(x^{(s)}_{a,w},\, y^{(s)}_{a,w}\big) \)</div>
       <div class="lab">Loss 2, 2-day</div><div class="eq">\( \displaystyle L_2^{\text{2d}} \;=\; \dfrac{1}{|G|}\sum_{g \in G}\; \dfrac{1}{|A_g|}\sum_{a \in A_g}\; \dfrac{1}{6}\sum_{w=1}^{6} D_{a,w} \)</div>
-      <div class="lab">Loss 3, 2-day</div><div class="eq">\( \displaystyle L_3^{\text{2d}} \;=\; \dfrac{1}{|G|}\sum_{g \in G}\; \dfrac{1}{|A_g|}\sum_{a \in A_g}\; \dfrac{1}{|W_a|}\sum_{w \in W_a} \dfrac{1}{|Q_{a,w}|}\sum_{q \in Q_{a,w}} \dfrac{D_{q,w}}{c_a} \)</div>
+      <div class="lab">Loss 3, 2-day</div><div class="eq">\( \displaystyle L_3^{\text{2d}} \;=\; \dfrac{1}{|G|}\sum_{g \in G}\; \dfrac{1}{|A_g|}\sum_{a \in A_g}\; \dfrac{1}{|W_a|}\sum_{w \in W_a} \dfrac{1}{|Q_{a,w}|}\sum_{q \in Q_{a,w}} \dfrac{D_{q,w}}{c_g} \)</div>
     </div>
     <dl class="defs">
       <dt>\(W_w\)</dt><dd>window \(w\) = days \(w\) and \(w{+}1\), \(w = 1,\dots,6\)</dd>
       <dt>\(Q_{a,w}\)</dt><dd>account \(a\)'s held-out posts made before the end of \(W_w\) (posts that exist during the window, older ones included)</dd>
       <dt>\(W_a\)</dt><dd>the windows in which account \(a\) has at least one such post</dd>
-      <dt>likes, 2-day</dt><dd>only likes made inside \(W_w\) count: \(y_{u,q,w}\), \(p_{u,q,w}\), \(U_{q,w}\) and \(L_{q,w}\) are Loss 1's quantities restricted to likes in the window; \(D_{q,w}\) is Loss 3's deviance on the window's real and simulated like counts, same floor, same \(c_a\)</dd>
+      <dt>likes, 2-day</dt><dd>only likes made inside \(W_w\) count: \(y_{u,q,w}\), \(p_{u,q,w}\) and \(U_{q,w}\) are Loss 1's quantities restricted to likes in the window; \(D_{q,w}\) is Loss 3's deviance on the window's real and simulated like counts, same floor; both use the same \(c_g\)</dd>
       <dt>followers, 2-day</dt><dd>each of the six series is summed over the window's two days, then \(\log(1+\cdot)\) and fair CRPS exactly as in Loss 2</dd>
       <dt>empty windows</dt><dd>a post with no likes in a window, real or simulated, scores 0 there and still counts in the average, the same for every simulation</dd>
     </dl>
 
     <h3>Bars on the leaderboard</h3>
-    <p>Bar height is \(e^{-\text{loss}}\): 1.0 for perfect, 0.5 at a loss of 0.69, 0.25 at 1.39. Entries are ordered by the average of \(e^{-\text{loss}}\) over all six numbers, \(\tfrac{1}{6}\sum_{i=1}^{3}\big(e^{-L_i} + e^{-L_i^{\text{2d}}}\big)\), highest first. Entries submitted before Sep 30, 2026 have only \(L_1\) and \(L_2\) at the headline timescale; they are listed after the complete entries, ordered by \(\tfrac{1}{2}\big(e^{-L_1} + e^{-L_2}\big)\).</p>
+    <p>Bar height is \(e^{-\text{loss}}\): 1.0 for perfect, 0.5 at a loss of 0.69, 0.25 at 1.39. Entries are ordered by the average of \(e^{-\text{loss}}\) over all six numbers, \(\tfrac{1}{6}\sum_{i=1}^{3}\big(e^{-L_i} + e^{-L_i^{\text{2d}}}\big)\), highest first. Entries submitted before Sep 30, 2026 have only \(L_1\) and \(L_2\) at the headline timescale, with \(L_1\) divided by each post's real likes; they are listed after the complete entries, ordered by \(\tfrac{1}{2}\big(e^{-L_1} + e^{-L_2}\big)\), and left out of the best scores and charts.</p>
   </section>
 </div>
 
@@ -336,9 +335,10 @@
   }
 
   function render(rows){
-    // best cards
+    // best cards and charts: complete entries only, the older Liker Brier is on another scale
+    const current = rows.filter(complete);
     LOSSES.forEach(L => {
-      const b = lowest(rows, L.key), b2 = lowest(rows, L.key2);
+      const b = lowest(current, L.key), b2 = lowest(current, L.key2);
       $('best-' + L.short).textContent = b ? fmt(b[L.key]) : '—';
       $('best-' + L.short + '-who').textContent = b ? b.model_title + ' · ' + day(b.created_at) : 'no scores yet';
       $('best-' + L.short + '-2d').textContent = b2 ? fmt(b2[L.key2]) : '—';
@@ -347,8 +347,8 @@
 
     const order = ranked(rows);
     const bestId = order.length ? order[0].id : null;
-    drawChart($('chart'), rows, 'key', bestId, 'No scores yet.');
-    drawChart($('chart2d'), rows.filter(r => LOSSES.some(L => has(r[L.key2]))), 'key2', bestId, 'No 2-day scores yet.');
+    drawChart($('chart'), current, 'key', bestId, 'No scores yet.');
+    drawChart($('chart2d'), current, 'key2', bestId, 'No 2-day scores yet.');
 
     // entries: complete ones best first, then the two-loss entries from before Sep 30 2026
     const cell = (r, k, c) => has(r[k]) ? '<td class="' + c + '">' + fmt(r[k]) + '</td>' : '<td class="na">—</td>';
@@ -358,7 +358,7 @@
       let head = '';
       if (!full && !olderShown) {
         olderShown = true;
-        head = '<div class="older">Submitted before Sep 30, 2026: Liker Brier and Follower CRPS at the headline timescale only.</div>';
+        head = '<div class="older">Submitted before Sep 30, 2026: Liker Brier and Follower CRPS at the headline timescale only. Their Liker Brier divides by each post\'s real likes, so it is not comparable with the entries above.</div>';
       }
       return head + '<div class="entry" data-id="' + r.id + '">' +
         '<div class="top">' +
