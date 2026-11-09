@@ -53,6 +53,7 @@
   .bar{width:30px;border-radius:5px 5px 0 0;position:relative;transition:height .3s}
   .bar.likes{background:var(--likes)} .bar.follow{background:var(--follow)} .bar.pois{background:var(--pois)} .bar.na{background:#e3e5e8}
   .bar.na .n{color:var(--muted)}
+  .bar.old{opacity:.4} .bar.old .n{color:var(--muted)}
   .bar .n{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:.72rem;color:var(--ink);white-space:nowrap}
   .group .t{margin-top:10px;font-size:.82rem;font-weight:600;text-align:center;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .group .d{font-size:.72rem;color:var(--muted)}
@@ -162,6 +163,7 @@
       <span><i class="sw" style="background:var(--follow)"></i>Follower CRPS</span>
       <span><i class="sw" style="background:var(--pois)"></i>Like-count Poisson</span>
       <span>bar height = e<sup>−loss</sup>, so a lower loss is a taller bar (1.0 = perfect) · grey = not reported</span>
+      <span>* faded = Liker Brier from before Nov 6, 2026, divided by each post's real likes: lower than now for the same forecast (naming no one 0.600 then, 1.12 now)</span>
     </div>
     <div class="chart-outer"><div class="chart" id="chart"></div></div>
 
@@ -249,7 +251,7 @@
     </dl>
 
     <h3>Bars on the leaderboard</h3>
-    <p>Bar height is \(e^{-\text{loss}}\): 1.0 for perfect, 0.5 at a loss of 0.69, 0.25 at 1.39. Entries are ordered by the average of \(e^{-\text{loss}}\) over all six numbers, \(\tfrac{1}{6}\sum_{i=1}^{3}\big(e^{-L_i} + e^{-L_i^{\text{2d}}}\big)\), highest first. Entries submitted before Sep 30, 2026 have only \(L_1\) and \(L_2\) at the headline timescale, with \(L_1\) divided by each post's real likes; they are listed after the complete entries, ordered by \(\tfrac{1}{2}\big(e^{-L_1} + e^{-L_2}\big)\), and left out of the best scores and charts.</p>
+    <p>Bar height is \(e^{-\text{loss}}\): 1.0 for perfect, 0.5 at a loss of 0.69, 0.25 at 1.39. Entries are ordered by the average of \(e^{-\text{loss}}\) over all six numbers, \(\tfrac{1}{6}\sum_{i=1}^{3}\big(e^{-L_i} + e^{-L_i^{\text{2d}}}\big)\), highest first. Entries submitted before Sep 30, 2026 have only \(L_1\) and \(L_2\) at the headline timescale, with \(L_1\) divided by each post's real likes; they are listed after the complete entries, ordered by \(\tfrac{1}{2}\big(e^{-L_1} + e^{-L_2}\big)\). Their \(L_1\) is marked * and drawn faded, and left out of the best Liker Brier; naming no one scores 0.600 that way and 1.12 now.</p>
   </section>
 </div>
 
@@ -291,15 +293,19 @@
   const REST = cfg.supabaseUrl + '/rest/v1';
   const $ = id => document.getElementById(id);
   const fmt = v => (v == null ? '—' : (Math.abs(v) >= 10 ? v.toFixed(2) : v.toFixed(3)));
-  // the three losses; `key` = headline timescale, `key2` = 2-day windows
+  // the three losses; `key` = headline timescale, `key2` = 2-day windows; `rescaled` = the two-loss entries' number is on the rule before Nov 6 2026
   const LOSSES = [
-    { key: 'likes_loss',     key2: 'likes_loss_2d',     cls: 'likes',  short: 'l1', name: 'Liker Brier' },
+    { key: 'likes_loss',     key2: 'likes_loss_2d',     cls: 'likes',  short: 'l1', name: 'Liker Brier', rescaled: true },
     { key: 'followers_loss', key2: 'followers_loss_2d', cls: 'follow', short: 'l2', name: 'Follower CRPS' },
     { key: 'poisson_loss',   key2: 'poisson_loss_2d',   cls: 'pois',   short: 'l3', name: 'Like-count Poisson' },
   ];
   const has = v => v != null;
   const vals = r => LOSSES.flatMap(L => [r[L.key], r[L.key2]]).filter(has);
   const complete = r => vals(r).length === 6;
+  // a number scored on the old rule: shown with * and faded, never the best
+  const old = (r, L) => !!L.rescaled && !complete(r);
+  const shown = (r, L, k) => fmt(r[k]) + (old(r, L) ? '*' : '');
+  const OLD_NOTE = 'Liker Brier before Nov 6, 2026: divided by each post\'s real likes, lower than now for the same forecast';
   // average of e^-loss over the numbers the entry has (six; two for entries from before Sep 30 2026)
   const score = r => { const v = vals(r); return v.reduce((t, x) => t + Math.exp(-x), 0) / v.length; };
   const ranked = rows => {
@@ -335,10 +341,10 @@
   }
 
   function render(rows){
-    // best cards and charts: complete entries only, the older Liker Brier is on another scale
-    const current = rows.filter(complete);
+    // best cards: every entry, except numbers on the old rule
     LOSSES.forEach(L => {
-      const b = lowest(current, L.key), b2 = lowest(current, L.key2);
+      const pool = rows.filter(r => !old(r, L));
+      const b = lowest(pool, L.key), b2 = lowest(pool, L.key2);
       $('best-' + L.short).textContent = b ? fmt(b[L.key]) : '—';
       $('best-' + L.short + '-who').textContent = b ? b.model_title + ' · ' + day(b.created_at) : 'no scores yet';
       $('best-' + L.short + '-2d').textContent = b2 ? fmt(b2[L.key2]) : '—';
@@ -347,26 +353,28 @@
 
     const order = ranked(rows);
     const bestId = order.length ? order[0].id : null;
-    drawChart($('chart'), current, 'key', bestId, 'No scores yet.');
-    drawChart($('chart2d'), current, 'key2', bestId, 'No 2-day scores yet.');
+    drawChart($('chart'), rows, 'key', bestId, 'No scores yet.');
+    drawChart($('chart2d'), rows.filter(r => LOSSES.some(L => has(r[L.key2]))), 'key2', bestId, 'No 2-day scores yet.');
 
     // entries: complete ones best first, then the two-loss entries from before Sep 30 2026
-    const cell = (r, k, c) => has(r[k]) ? '<td class="' + c + '">' + fmt(r[k]) + '</td>' : '<td class="na">—</td>';
+    const cell = (r, L, k) => has(r[k])
+      ? '<td class="' + L.short + '"' + (old(r, L) ? ' title="' + OLD_NOTE + '"' : '') + '>' + shown(r, L, k) + '</td>'
+      : '<td class="na">—</td>';
     let rank = 0, olderShown = false;
     $('entries').innerHTML = order.length ? order.map(r => {
       const full = complete(r);
       let head = '';
       if (!full && !olderShown) {
         olderShown = true;
-        head = '<div class="older">Submitted before Sep 30, 2026: Liker Brier and Follower CRPS at the headline timescale only. Their Liker Brier divides by each post\'s real likes, so it is not comparable with the entries above.</div>';
+        head = '<div class="older">Submitted before Sep 30, 2026: Liker Brier and Follower CRPS at the headline timescale only. * Their Liker Brier divides by each post\'s real likes, so it is lower than the entries above for the same forecast (naming no one 0.600 then, 1.12 now).</div>';
       }
       return head + '<div class="entry" data-id="' + r.id + '">' +
         '<div class="top">' +
           '<div><span class="rank">' + (full ? '#' + (++rank) : '–') + '</span><span class="title">' + esc(r.model_title) + '</span>' +
             '<div class="meta">' + day(r.created_at) + (r.submitted_by ? ' · ' + esc(r.submitted_by) : '') + ' · combined ' + score(r).toFixed(3) + '</div></div>' +
           '<table class="nt"><thead><tr><th></th>' + LOSSES.map(L => '<th>' + L.name + '</th>').join('') + '</tr></thead><tbody>' +
-            '<tr><th>headline</th>' + LOSSES.map(L => cell(r, L.key, L.short)).join('') + '</tr>' +
-            '<tr><th>2-day</th>' + LOSSES.map(L => cell(r, L.key2, L.short)).join('') + '</tr>' +
+            '<tr><th>headline</th>' + LOSSES.map(L => cell(r, L, L.key)).join('') + '</tr>' +
+            '<tr><th>2-day</th>' + LOSSES.map(L => cell(r, L, L.key2)).join('') + '</tr>' +
           '</tbody></table>' +
         '</div>' +
         (r.description ? '<div class="desc">' + esc(r.description) + '</div>' : '') +
@@ -386,7 +394,7 @@
         LOSSES.map(L => {
           const v = r[L[which]];
           return has(v)
-            ? '<div class="bar ' + L.cls + '" title="' + L.name + '" style="height:' + Math.max(2, Math.exp(-v) * H_PX).toFixed(1) + 'px"><span class="n">' + fmt(v) + '</span></div>'
+            ? '<div class="bar ' + L.cls + (old(r, L) ? ' old' : '') + '" title="' + (old(r, L) ? OLD_NOTE : L.name) + '" style="height:' + Math.max(2, Math.exp(-v) * H_PX).toFixed(1) + 'px"><span class="n">' + shown(r, L, L[which]) + '</span></div>'
             : '<div class="bar na" title="' + L.name + ': not reported" style="height:2px"><span class="n">—</span></div>';
         }).join('') +
         '</div>' +
